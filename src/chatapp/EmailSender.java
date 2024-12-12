@@ -15,38 +15,38 @@ import javax.mail.*;
 import javax.mail.internet.*;
 
 public class EmailSender {
-    private static final String EMAIL = "iamztk1106@gmail.com"; // Email cố định
-    private static final String PASSWORD = "vblh fseq losg nemt"; // Mật khẩu ứng dụng
+    public static void sendEmail(String to, String subject, String body) {
+        String from = "nguyencongvinh2909@gmail.com";  // Thay bằng email của bạn
+        String password = "dfbs xtdp brco gagd";  // Thay bằng mật khẩu ứng dụng Gmail của bạn
 
-    public static void sendEmail(String toEmail, String subject, String messageText) {
-        // Thiết lập thông tin SMTP server
-        Properties props = new Properties();
-        props.put("mail.smtp.host", "smtp.gmail.com"); // Server SMTP
-        props.put("mail.smtp.port", "587"); // Cổng SMTP (TLS)
-        props.put("mail.smtp.auth", "true");
-        props.put("mail.smtp.starttls.enable", "true");
+        // Cấu hình thuộc tính
+        Properties properties = new Properties();
+        properties.put("mail.smtp.host", "smtp.gmail.com");
+        properties.put("mail.smtp.port", "587");
+        properties.put("mail.smtp.auth", "true");
+        properties.put("mail.smtp.starttls.enable", "true");
 
-        // Tạo session
-        Session session = Session.getInstance(props, new Authenticator() {
-            @Override
+        // Tạo Session và thiết lập xác thực
+        Session session = Session.getInstance(properties, new javax.mail.Authenticator() {
             protected PasswordAuthentication getPasswordAuthentication() {
-                return new PasswordAuthentication(EMAIL, PASSWORD);
+                return new PasswordAuthentication(from, password);
             }
         });
 
         try {
             // Tạo email
             Message message = new MimeMessage(session);
-            message.setFrom(new InternetAddress(EMAIL));
-            message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(toEmail));
+            message.setFrom(new InternetAddress(from));
+            message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(to));
             message.setSubject(subject);
-            message.setText(messageText);
+            message.setText(body);
 
             // Gửi email
             Transport.send(message);
-            System.out.println("Email đã được gửi đến: " + toEmail);
+            System.out.println("OTP đã được gửi đến: " + to);
         } catch (MessagingException e) {
-            System.err.println("Lỗi khi gửi email: " + e.getMessage());
+            e.printStackTrace();
+            System.out.println("Không thể gửi email.");
         }
     }
 }

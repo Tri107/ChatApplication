@@ -6,10 +6,14 @@
 package Form;
 
 import DB.DBAccess;
+import Form.frmOTP;
+import chatapp.EmailSender;
+import Form.frmRegister ;
 import javax.swing.JOptionPane;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import javax.activation.DataHandler;
-import javax.activation.DataSource;
+import java.security.SecureRandom;
+import java.sql.SQLException;
 
 /**
  *
@@ -20,11 +24,12 @@ public class frmOTP extends javax.swing.JFrame {
 
     /** Creates new form frmOTP */
     public frmOTP() {
-        this.userId = userId;
-    initComponents();
+        initComponents();
     }
     public frmOTP(int userId) {
-        this.userId = userId;
+        if (userId <= 0) {
+            throw new IllegalArgumentException("UserID không hợp lệ!");
+        }
         initComponents();
     }
     
@@ -41,85 +46,112 @@ public class frmOTP extends javax.swing.JFrame {
         txtotp = new javax.swing.JTextField();
         btnxacnhan = new javax.swing.JButton();
         btnguilai = new javax.swing.JButton();
+        jLabel1 = new javax.swing.JLabel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
 
-        btnxacnhan.setText("xac nhan");
+        btnxacnhan.setText("Xác Nhận");
         btnxacnhan.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 btnxacnhanActionPerformed(evt);
             }
         });
 
-        btnguilai.setText("gui lai");
+        btnguilai.setText("Gửi Lại");
         btnguilai.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 btnguilaiActionPerformed(evt);
             }
         });
 
+        jLabel1.setFont(new java.awt.Font("Segoe UI", 1, 36)); // NOI18N
+        jLabel1.setText("Nhập Mã OTP");
+
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
-                .addGap(123, 123, 123)
+                .addGap(104, 104, 104)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(txtotp, javax.swing.GroupLayout.PREFERRED_SIZE, 338, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addGroup(layout.createSequentialGroup()
+                        .addGap(11, 11, 11)
                         .addComponent(btnxacnhan)
                         .addGap(158, 158, 158)
-                        .addComponent(btnguilai))
-                    .addComponent(txtotp, javax.swing.GroupLayout.PREFERRED_SIZE, 260, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addContainerGap(159, Short.MAX_VALUE))
+                        .addComponent(btnguilai)))
+                .addContainerGap(134, Short.MAX_VALUE))
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addComponent(jLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, 368, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(64, 64, 64))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
-                .addGap(115, 115, 115)
+                .addGap(18, 18, 18)
+                .addComponent(jLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, 83, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(18, 18, 18)
                 .addComponent(txtotp, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(78, 78, 78)
+                .addGap(30, 30, 30)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(btnxacnhan)
                     .addComponent(btnguilai))
-                .addContainerGap(155, Short.MAX_VALUE))
+                .addContainerGap(58, Short.MAX_VALUE))
         );
 
         pack();
     }// </editor-fold>//GEN-END:initComponents
 
     private void btnxacnhanActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnxacnhanActionPerformed
-        String otp = txtotp.getText();
+       String otp = txtotp.getText();
 
-    if (otp.isEmpty()) {
-        JOptionPane.showMessageDialog(this, "Vui lòng nhập mã OTP!");
-        return;
+if (otp.isEmpty()) {
+    JOptionPane.showMessageDialog(this, "Vui lòng nhập mã OTP!");
+    return;
+}
+
+try {
+    DBAccess db = new DBAccess();
+    
+    // Kiểm tra thông tin nhập vào
+    System.out.println("UserID: " + userId + ", OTP: " + otp);
+
+    // Truy vấn OTP từ cơ sở dữ liệu
+    String query = "SELECT * FROM OTPs WHERE UserID = ? AND OTPCode = ? AND ExpiryTime > CURRENT_TIMESTAMP AND IsUsed = FALSE";
+    PreparedStatement stmt = db.getConnection().prepareStatement(query);
+    stmt.setInt(1, userId);
+    stmt.setString(2, otp);
+    ResultSet rs = stmt.executeQuery();
+
+    if (rs.next()) {
+        // Cập nhật trạng thái xác minh người dùng
+        String updateUserQuery = "UPDATE Users SET IsVerified = TRUE WHERE UserID = ?";
+        PreparedStatement updateUserStmt = db.getConnection().prepareStatement(updateUserQuery);
+        updateUserStmt.setInt(1, userId);
+        updateUserStmt.executeUpdate();
+
+        // Đánh dấu OTP đã sử dụng
+        String updateOtpQuery = "UPDATE OTPs SET IsUsed = TRUE WHERE OTPID = ?";
+        PreparedStatement updateOtpStmt = db.getConnection().prepareStatement(updateOtpQuery);
+        updateOtpStmt.setInt(1, rs.getInt("OTPID"));
+        updateOtpStmt.executeUpdate();
+
+        JOptionPane.showMessageDialog(this, "Xác minh thành công!");
+        this.dispose();
+    } else {
+        JOptionPane.showMessageDialog(this, "Mã OTP không hợp lệ hoặc đã hết hạn!");
+        System.out.println("Không tìm thấy OTP hợp lệ.");
     }
 
-    try {
-        DBAccess db = new DBAccess();
-        String query = "SELECT * FROM OTPs WHERE UserID = " + userId + " AND OTPCode = '" + otp
-                + "' AND ExpiryTime > CURRENT_TIMESTAMP AND IsUsed = FALSE";
-        ResultSet rs = db.Query(query);
-
-        if (rs.next()) {
-            // Cập nhật trạng thái xác minh
-            String updateUserQuery = "UPDATE Users SET IsVerified = TRUE WHERE UserID = " + userId;
-            db.Update(updateUserQuery);
-
-            // Đánh dấu OTP đã sử dụng
-            String updateOtpQuery = "UPDATE OTPs SET IsUsed = TRUE WHERE OTPID = " + rs.getInt("OTPID");
-            db.Update(updateOtpQuery);
-
-            JOptionPane.showMessageDialog(this, "Xác minh thành công!");
-            this.dispose();
-        } else {
-            JOptionPane.showMessageDialog(this, "Mã OTP không hợp lệ hoặc đã hết hạn!");
-        }
-
-        db.close();
-    } catch (Exception e) {
-        JOptionPane.showMessageDialog(this, "Lỗi: " + e.getMessage());
-    }
+    db.close();
+} catch (SQLException sqle) {
+    JOptionPane.showMessageDialog(this, "Lỗi cơ sở dữ liệu: " + sqle.getMessage());
+    sqle.printStackTrace();
+} catch (Exception e) {
+    JOptionPane.showMessageDialog(this, "Lỗi: " + e.getMessage());
+    e.printStackTrace();
+}
     }//GEN-LAST:event_btnxacnhanActionPerformed
 
     private void btnguilaiActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnguilaiActionPerformed
@@ -182,6 +214,7 @@ public class frmOTP extends javax.swing.JFrame {
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton btnguilai;
     private javax.swing.JButton btnxacnhan;
+    private javax.swing.JLabel jLabel1;
     private javax.swing.JTextField txtotp;
     // End of variables declaration//GEN-END:variables
 

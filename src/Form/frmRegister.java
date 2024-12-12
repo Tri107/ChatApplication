@@ -7,12 +7,16 @@ package Form;
 import DB.DBAccess;
 import Form.frmOTP;
 import chatapp.EmailSender;
+import com.mysql.jdbc.PreparedStatement;
 import java.io.*;
 import java.net.Socket;
 import javax.swing.JOptionPane;
 import java.sql.ResultSet;
-import javax.activation.DataHandler;
-import javax.activation.DataSource;
+import jakarta.activation.DataHandler;
+import jakarta.activation.DataSource;
+
+
+
 
 /**
  *
@@ -137,7 +141,7 @@ public class frmRegister extends javax.swing.JFrame {
     }// </editor-fold>//GEN-END:initComponents
 
     private void btndangkiActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btndangkiActionPerformed
-         try {
+        try {
             // Lấy thông tin từ form
             String tenHienThi = txttenhienthi.getText().trim();
             String email = txtemail.getText().trim();
@@ -189,28 +193,34 @@ public class frmRegister extends javax.swing.JFrame {
                     // Tạo OTP và gửi email
                     String otp = String.format("%06d", new java.util.Random().nextInt(1000000));
                     long expiryTime = System.currentTimeMillis() + 5 * 60 * 1000; // 5 phút
+                    java.sql.Timestamp expiryTimestamp = new java.sql.Timestamp(expiryTime);
                     EmailSender.sendEmail(email, "Xác nhận đăng ký ChatApp", 
                             "Chào bạn,\n\nMã OTP của bạn là: " + otp + "\nMã này sẽ hết hạn sau 5 phút.\n\nChatApp Team");
 
                     // Lưu OTP vào cơ sở dữ liệu
-                    
+                    String otpQuery = "INSERT INTO OTPs (UserID, OTPCode, ExpiryTime, IsUsed) VALUES (?, ?, ?, FALSE)";
+            PreparedStatement otpStmt = db.getConnection().prepareStatement(otpQuery);
+            otpStmt.setInt(1, userId); // UserID
+            otpStmt.setString(2, otp); // OTPCode
+            otpStmt.setTimestamp(3, expiryTimestamp); // ExpiryTime
+            otpStmt.executeUpdate();
 
-                    //db.Update(otpQuery);
-
-                    // Thông báo và chuyển sang form OTP
-                    JOptionPane.showMessageDialog(this, "Mã OTP đã được gửi tới email của bạn.");
-                    new frmOTP(userId).setVisible(true);
-                    this.dispose();
-                }
-            } else {
-                JOptionPane.showMessageDialog(this, "Lỗi trong quá trình đăng ký.");
-            }
-
-            db.close();
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Lỗi: " + e.getMessage());
-            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Mã OTP đã được gửi tới email của bạn.");
+            new frmOTP(userId).setVisible(true);
+            this.dispose();
         }
+    } else {
+        JOptionPane.showMessageDialog(this, "Lỗi trong quá trình đăng ký.");
+    }
+
+    db.close();
+} catch (SQLException sqle) {
+    JOptionPane.showMessageDialog(this, "Lỗi cơ sở dữ liệu: " + sqle.getMessage());
+    sqle.printStackTrace();
+} catch (Exception e) {
+    JOptionPane.showMessageDialog(this, "Lỗi không xác định: " + e.getMessage());
+    e.printStackTrace();
+}
     
 
     }//GEN-LAST:event_btndangkiActionPerformed

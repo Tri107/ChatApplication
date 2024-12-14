@@ -3,9 +3,8 @@
  * Click nbfs://nbhost/SystemFileSystem/Templates/GUIForms/JFrame.java to edit this template
  */
 package Form;
-
+import chatapp.OTPManager;
 import DB.DBAccess;
-import Form.frmOTP;
 import chatapp.EmailSender;
 import com.mysql.jdbc.PreparedStatement;
 import java.io.*;
@@ -14,15 +13,17 @@ import javax.swing.JOptionPane;
 import java.sql.ResultSet;
 import jakarta.activation.DataHandler;
 import jakarta.activation.DataSource;
-
-
-
+import java.sql.*;
 
 /**
  *
  * @author DELL
  */
 public class frmRegister extends javax.swing.JFrame {
+
+    private static String generatedOtp;
+
+    
 
     /**
      * Creates new form frmRegister
@@ -50,8 +51,8 @@ public class frmRegister extends javax.swing.JFrame {
         txttenhienthi = new javax.swing.JTextField();
         txtemail = new javax.swing.JTextField();
         txttendangnhap = new javax.swing.JTextField();
-        txtmatkhau = new javax.swing.JTextField();
-        txtxacnhanmk = new javax.swing.JTextField();
+        txtmatkhau = new javax.swing.JPasswordField();
+        txtxacnhanmk = new javax.swing.JPasswordField();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
 
@@ -100,11 +101,8 @@ public class frmRegister extends javax.swing.JFrame {
                         .addGap(1, 1, 1)
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(txttendangnhap)
-                            .addGroup(layout.createSequentialGroup()
-                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                    .addComponent(txtmatkhau, javax.swing.GroupLayout.PREFERRED_SIZE, 273, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                    .addComponent(txtxacnhanmk, javax.swing.GroupLayout.PREFERRED_SIZE, 268, javax.swing.GroupLayout.PREFERRED_SIZE))
-                                .addGap(0, 0, Short.MAX_VALUE)))))
+                            .addComponent(txtmatkhau)
+                            .addComponent(txtxacnhanmk))))
                 .addGap(99, 99, 99))
         );
         layout.setVerticalGroup(
@@ -141,88 +139,62 @@ public class frmRegister extends javax.swing.JFrame {
     }// </editor-fold>//GEN-END:initComponents
 
     private void btndangkiActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btndangkiActionPerformed
-        try {
-            // Lấy thông tin từ form
-            String tenHienThi = txttenhienthi.getText().trim();
-            String email = txtemail.getText().trim();
-            String tenDangNhap = txttendangnhap.getText().trim();
-            String matKhau = txtmatkhau.getText().trim();
-            String xacNhanMK = txtxacnhanmk.getText().trim();
+       try {
+        String tenHienThi = txttenhienthi.getText().trim();
+        String email = txtemail.getText().trim();
+        String tenDangNhap = txttendangnhap.getText().trim();
+        String matKhau = new String(txtmatkhau.getPassword()).trim();
+        String xacNhanMK = new String(txtxacnhanmk.getPassword()).trim();
 
-            // Kiểm tra thông tin nhập liệu
-            if (tenHienThi.isEmpty() || email.isEmpty() || tenDangNhap.isEmpty() || matKhau.isEmpty() || xacNhanMK.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "Vui lòng nhập đầy đủ thông tin!");
-                return;
-            }
-
-            if (!matKhau.equals(xacNhanMK)) {
-                JOptionPane.showMessageDialog(this, "Mật khẩu và xác nhận mật khẩu không khớp!");
-                return;
-            }
-
-            // Kiểm tra email hợp lệ
-            if (!email.matches("^[\\w.%+-]+@[\\w.-]+\\.[a-zA-Z]{2,6}$")) {
-                JOptionPane.showMessageDialog(this, "Email không hợp lệ!");
-                return;
-            }
-
-            // Mã hóa mật khẩu (giả sử bạn đã có hàm băm mật khẩu)
-            //String hashedPassword = HashUtil.hashPassword(matKhau); // Dùng thư viện băm mật khẩu.
-
-            // Kết nối tới cơ sở dữ liệu
-            DBAccess db = new DBAccess();
-
-            // Kiểm tra tài khoản đã tồn tại chưa
-            ResultSet rsCheck = db.Query("SELECT * FROM Users WHERE Username = '" + tenDangNhap + "' OR Email = '" + email + "'");
-            if (rsCheck.next()) {
-                JOptionPane.showMessageDialog(this, "Tên đăng nhập hoặc email đã tồn tại!");
-                return;
-            }
-
-            // Thêm người dùng mới vào cơ sở dữ liệu
-            String query = "INSERT INTO Users (DisplayName, Username, PasswordHash, Email) VALUES ('"
-                    + tenHienThi + "', '" + tenDangNhap + "', '" + matKhau + "', '" + email + "')";
-            int result = db.Update(query);
-
-            if (result > 0) {
-                // Lấy UserID của tài khoản vừa tạo
-                ResultSet rs = db.Query("SELECT UserID FROM Users WHERE Email = '" + email + "'");
-                if (rs.next()) {
-                    int userId = rs.getInt("UserID");
-
-                    // Tạo OTP và gửi email
-                    String otp = String.format("%06d", new java.util.Random().nextInt(1000000));
-                    long expiryTime = System.currentTimeMillis() + 5 * 60 * 1000; // 5 phút
-                    java.sql.Timestamp expiryTimestamp = new java.sql.Timestamp(expiryTime);
-                    EmailSender.sendEmail(email, "Xác nhận đăng ký ChatApp", 
-                            "Chào bạn,\n\nMã OTP của bạn là: " + otp + "\nMã này sẽ hết hạn sau 5 phút.\n\nChatApp Team");
-
-                    // Lưu OTP vào cơ sở dữ liệu
-                    String otpQuery = "INSERT INTO OTPs (UserID, OTPCode, ExpiryTime, IsUsed) VALUES (?, ?, ?, FALSE)";
-            PreparedStatement otpStmt = db.getConnection().prepareStatement(otpQuery);
-            otpStmt.setInt(1, userId); // UserID
-            otpStmt.setString(2, otp); // OTPCode
-            otpStmt.setTimestamp(3, expiryTimestamp); // ExpiryTime
-            otpStmt.executeUpdate();
-
-            JOptionPane.showMessageDialog(this, "Mã OTP đã được gửi tới email của bạn.");
-            new frmOTP(userId).setVisible(true);
-            this.dispose();
+        // Kiểm tra dữ liệu đầu vào
+        if (tenHienThi.isEmpty() || email.isEmpty() || tenDangNhap.isEmpty() || matKhau.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Vui lòng nhập đầy đủ thông tin!");
+            return;
         }
-    } else {
-        JOptionPane.showMessageDialog(this, "Lỗi trong quá trình đăng ký.");
+
+        if (!matKhau.equals(xacNhanMK)) {
+            JOptionPane.showMessageDialog(this, "Mật khẩu và xác nhận mật khẩu không khớp!");
+            return;
+        }
+
+        // Kiểm tra định dạng email
+        if (!email.matches("^[\\w.%+-]+@[\\w.-]+\\.[a-zA-Z]{2,6}$")) {
+            JOptionPane.showMessageDialog(this, "Email không hợp lệ!");
+            return;
+        }
+
+        // Kiểm tra tên đăng nhập hoặc email đã tồn tại
+        DBAccess db = new DBAccess();
+        String checkQuery = "SELECT * FROM Users WHERE Username = ? OR Email = ?";
+        PreparedStatement checkStmt = (PreparedStatement) db.getConnection().prepareStatement(checkQuery);
+        checkStmt.setString(1, tenDangNhap);
+        checkStmt.setString(2, email);
+
+        ResultSet rs = checkStmt.executeQuery();
+        if (rs.next()) {
+            JOptionPane.showMessageDialog(this, "Tên đăng nhập hoặc email đã tồn tại!");
+            return;
+        }
+
+        // Tạo mã OTP và lưu vào lớp quản lý chung
+        OTPManager.generatedOtp = String.format("%06d", new java.util.Random().nextInt(1000000));
+        OTPManager.otpExpiryTime = System.currentTimeMillis() + 5 * 60 * 1000; // Thời gian hết hạn OTP (5 phút)
+        OTPManager.email = email; // Lưu email để xác nhận sau này
+
+        // Gửi OTP qua email
+        EmailSender.sendEmail(email, "Xác nhận đăng ký",
+                "Mã OTP của bạn là: " + OTPManager.generatedOtp + ". Mã này sẽ hết hạn sau 5 phút.");
+
+        JOptionPane.showMessageDialog(this, "OTP đã được gửi tới email. Vui lòng xác nhận OTP.");
+
+        // Mở form nhập OTP và truyền userId để sử dụng sau này
+        new frmOTP(tenHienThi, tenDangNhap, matKhau).setVisible(true);
+        this.dispose();
+
+    } catch (Exception e) {
+        JOptionPane.showMessageDialog(this, "Lỗi: " + e.getMessage());
+        e.printStackTrace();
     }
-
-    db.close();
-} catch (SQLException sqle) {
-    JOptionPane.showMessageDialog(this, "Lỗi cơ sở dữ liệu: " + sqle.getMessage());
-    sqle.printStackTrace();
-} catch (Exception e) {
-    JOptionPane.showMessageDialog(this, "Lỗi không xác định: " + e.getMessage());
-    e.printStackTrace();
-}
-    
-
     }//GEN-LAST:event_btndangkiActionPerformed
 
     /**
@@ -269,9 +241,9 @@ public class frmRegister extends javax.swing.JFrame {
     private javax.swing.JLabel jLabel4;
     private javax.swing.JLabel jLabel5;
     private javax.swing.JTextField txtemail;
-    private javax.swing.JTextField txtmatkhau;
+    private javax.swing.JPasswordField txtmatkhau;
     private javax.swing.JTextField txttendangnhap;
     private javax.swing.JTextField txttenhienthi;
-    private javax.swing.JTextField txtxacnhanmk;
+    private javax.swing.JPasswordField txtxacnhanmk;
     // End of variables declaration//GEN-END:variables
 }

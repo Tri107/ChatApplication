@@ -1,96 +1,59 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package DB;
 
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.Statement;
-import javax.swing.JOptionPane;
+import java.sql.SQLException;
 
 
-/**
- *
- * @author DELL
- */
 public class DBAccess {
     private Connection con;
-    private Statement stmt;
 
+    // Constructor: Tạo kết nối cơ sở dữ liệu
     public DBAccess() {
-        try {
-            MyConnection mycon = new MyConnection();
-            con = mycon.getConnection();
-
-            // Kiểm tra xem kết nối có null không
-            if (con != null) {
-                stmt = con.createStatement();
-            } else {
-                throw new SQLException("Không thể kết nối đến cơ sở dữ liệu");
-            }
+        MyConnection mycon = new MyConnection();
+        con = mycon.getConnection(); // Lấy kết nối từ MyConnection
+    }
+    public int executeUpdate(String sql, Object... params) {
+        try (PreparedStatement pstmt = con.prepareStatement(sql)) {
+            setParameters(pstmt, params);
+            return pstmt.executeUpdate(); // Thực thi câu lệnh UPDATE/INSERT/DELETE
         } catch (SQLException e) {
-            // Ghi lỗi chi tiết khi gặp sự cố kết nối
-            JOptionPane.showMessageDialog(null, "Lỗi kết nối CSDL: " + e.getMessage(), "Lỗi", JOptionPane.ERROR_MESSAGE);
-        } catch (Exception e) {
-            // Ghi lại các lỗi khác
-            JOptionPane.showMessageDialog(null, "Lỗi khác: " + e.toString(), "Lỗi", JOptionPane.ERROR_MESSAGE);
+            e.printStackTrace();
+            return -1; // Nếu có lỗi, trả về -1
         }
     }
 
-    public int Update(String str) {
-        try {
-            // Kiểm tra xem statement có null không
-            if (stmt != null) {
-                return stmt.executeUpdate(str);
-            } else {
-                throw new SQLException("Statement chưa được khởi tạo.");
-            }
+   
+    public ResultSet executeQuery(String sql, Object... params) {
+        try (PreparedStatement pstmt = con.prepareStatement(sql)) {
+            setParameters(pstmt, params);
+            return pstmt.executeQuery(); // Trả về ResultSet của câu lệnh SELECT
         } catch (SQLException e) {
-            // Thông báo lỗi SQL
-            JOptionPane.showMessageDialog(null, "Lỗi khi thực hiện update: " + e.getMessage(), "Lỗi", JOptionPane.ERROR_MESSAGE);
-            return -1;
-        } catch (Exception e) {
-            // Xử lý lỗi chung
-            JOptionPane.showMessageDialog(null, "Lỗi: " + e.toString(), "Lỗi", JOptionPane.ERROR_MESSAGE);
-            return -1;
+            e.printStackTrace();
+            return null; // Nếu có lỗi, trả về null
+        }
+    }
+    private void setParameters(PreparedStatement pstmt, Object... params) throws SQLException {
+        for (int i = 0; i < params.length; i++) {
+            pstmt.setObject(i + 1, params[i]); // Thiết lập tham số vào PreparedStatement
         }
     }
 
-    public ResultSet Query(String str) {
-        try {
-            // Kiểm tra xem statement có null không
-            if (stmt != null) {
-                return stmt.executeQuery(str);
-            } else {
-                throw new SQLException("Statement chưa được khởi tạo.");
-            }
-        } catch (SQLException e) {
-            // Thông báo lỗi SQL
-            JOptionPane.showMessageDialog(null, "Lỗi khi thực hiện truy vấn: " + e.getMessage(), "Lỗi", JOptionPane.ERROR_MESSAGE);
-            return null;
-        } catch (Exception e) {
-            // Xử lý lỗi chung
-            JOptionPane.showMessageDialog(null, "Lỗi: " + e.toString(), "Lỗi", JOptionPane.ERROR_MESSAGE);
-            return null;
-        }
-    }
-
+   
     public Connection getConnection() {
         return con;
     }
 
-    // Đảm bảo đóng kết nối khi không còn sử dụng
+  
     public void close() {
         try {
-            if (stmt != null) {
-                stmt.close();
-            }
-            if (con != null) {
+            if (con != null && !con.isClosed()) {
                 con.close();
             }
         } catch (SQLException e) {
-            JOptionPane.showMessageDialog(null, "Lỗi khi đóng kết nối: " + e.getMessage(), "Lỗi", JOptionPane.ERROR_MESSAGE);
+            e.printStackTrace();
+            System.out.println("Không thể đóng kết nối cơ sở dữ liệu!");
         }
     }
 }

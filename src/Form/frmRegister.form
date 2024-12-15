@@ -101,20 +101,13 @@
                       </Group>
                       <Group type="102" alignment="0" attributes="0">
                           <Group type="103" groupAlignment="1" max="-2" attributes="0">
-                              <Component id="txttenhienthi1" alignment="0" pref="343" max="32767" attributes="0"/>
+                              <Component id="txttenhienthi" alignment="0" pref="343" max="32767" attributes="0"/>
                               <Component id="jLabel13" alignment="0" min="-2" max="-2" attributes="0"/>
-                              <Component id="txtemail2" alignment="0" max="32767" attributes="0"/>
+                              <Component id="txtemail" alignment="0" max="32767" attributes="0"/>
                               <Component id="jLabel11" alignment="0" min="-2" max="-2" attributes="0"/>
                           </Group>
                           <EmptySpace min="0" pref="0" max="32767" attributes="0"/>
                       </Group>
-                  </Group>
-              </Group>
-              <Group type="103" rootIndex="1" groupAlignment="0" attributes="0">
-                  <Group type="102" attributes="0">
-                      <EmptySpace min="0" pref="177" max="32767" attributes="0"/>
-                      <Component id="jLabel12" min="-2" max="-2" attributes="0"/>
-                      <EmptySpace min="0" pref="178" max="32767" attributes="0"/>
                   </Group>
               </Group>
           </Group>
@@ -138,11 +131,11 @@
                   <EmptySpace max="-2" attributes="0"/>
                   <Component id="jLabel11" min="-2" max="-2" attributes="0"/>
                   <EmptySpace max="-2" attributes="0"/>
-                  <Component id="txtemail2" min="-2" pref="31" max="-2" attributes="0"/>
+                  <Component id="txtemail" min="-2" pref="31" max="-2" attributes="0"/>
                   <EmptySpace max="-2" attributes="0"/>
                   <Component id="jLabel13" min="-2" max="-2" attributes="0"/>
                   <EmptySpace max="-2" attributes="0"/>
-                  <Component id="txttenhienthi1" min="-2" pref="31" max="-2" attributes="0"/>
+                  <Component id="txttenhienthi" min="-2" pref="31" max="-2" attributes="0"/>
                   <EmptySpace type="separate" max="-2" attributes="0"/>
                   <Component id="btndangki" min="-2" max="-2" attributes="0"/>
                   <EmptySpace type="separate" max="-2" attributes="0"/>
@@ -150,14 +143,7 @@
                       <Component id="btnlogin" alignment="3" min="-2" max="-2" attributes="0"/>
                       <Component id="jLabel8" alignment="3" min="-2" max="-2" attributes="0"/>
                   </Group>
-                  <EmptySpace max="32767" attributes="0"/>
-              </Group>
-              <Group type="103" rootIndex="1" groupAlignment="0" attributes="0">
-                  <Group type="102" attributes="0">
-                      <EmptySpace min="0" pref="245" max="32767" attributes="0"/>
-                      <Component id="jLabel12" min="-2" max="-2" attributes="0"/>
-                      <EmptySpace min="0" pref="252" max="32767" attributes="0"/>
-                  </Group>
+                  <EmptySpace pref="10" max="32767" attributes="0"/>
               </Group>
           </Group>
         </DimensionLayout>
@@ -251,15 +237,7 @@
             <Property name="text" type="java.lang.String" value="Email"/>
           </Properties>
         </Component>
-        <Component class="javax.swing.JTextField" name="txtemail2">
-        </Component>
-        <Component class="javax.swing.JLabel" name="jLabel12">
-          <Properties>
-            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
-              <Font name="Segoe UI" size="14" style="1"/>
-            </Property>
-            <Property name="text" type="java.lang.String" value="Email"/>
-          </Properties>
+        <Component class="javax.swing.JTextField" name="txtemail">
         </Component>
         <Component class="javax.swing.JLabel" name="jLabel13">
           <Properties>
@@ -269,7 +247,7 @@
             <Property name="text" type="java.lang.String" value="T&#xea;n hi&#x1ec3;n th&#x1ecb;"/>
           </Properties>
         </Component>
-        <Component class="javax.swing.JTextField" name="txttenhienthi1">
+        <Component class="javax.swing.JTextField" name="txttenhienthi">
         </Component>
       </SubComponents>
     </Container>

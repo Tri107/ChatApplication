@@ -54,10 +54,9 @@ public class frmRegister extends javax.swing.JFrame {
         jLabel10 = new javax.swing.JLabel();
         txtxacnhanmk = new javax.swing.JPasswordField();
         jLabel11 = new javax.swing.JLabel();
-        txtemail2 = new javax.swing.JTextField();
-        jLabel12 = new javax.swing.JLabel();
+        txtemail = new javax.swing.JTextField();
         jLabel13 = new javax.swing.JLabel();
-        txttenhienthi1 = new javax.swing.JTextField();
+        txttenhienthi = new javax.swing.JTextField();
         jPanel3 = new javax.swing.JPanel();
 
         jPanel1.setBackground(new java.awt.Color(153, 255, 204));
@@ -115,9 +114,6 @@ public class frmRegister extends javax.swing.JFrame {
         jLabel11.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         jLabel11.setText("Email");
 
-        jLabel12.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
-        jLabel12.setText("Email");
-
         jLabel13.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
         jLabel13.setText("Tên hiển thị");
 
@@ -150,16 +146,11 @@ public class frmRegister extends javax.swing.JFrame {
                         .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                     .addGroup(jPanel2Layout.createSequentialGroup()
                         .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
-                            .addComponent(txttenhienthi1, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, 343, Short.MAX_VALUE)
+                            .addComponent(txttenhienthi, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, 343, Short.MAX_VALUE)
                             .addComponent(jLabel13, javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(txtemail2, javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(txtemail, javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(jLabel11, javax.swing.GroupLayout.Alignment.LEADING))
                         .addGap(0, 0, Short.MAX_VALUE))))
-            .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                .addGroup(jPanel2Layout.createSequentialGroup()
-                    .addGap(0, 177, Short.MAX_VALUE)
-                    .addComponent(jLabel12)
-                    .addGap(0, 178, Short.MAX_VALUE)))
         );
         jPanel2Layout.setVerticalGroup(
             jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -180,23 +171,18 @@ public class frmRegister extends javax.swing.JFrame {
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(jLabel11)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(txtemail2, javax.swing.GroupLayout.PREFERRED_SIZE, 31, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addComponent(txtemail, javax.swing.GroupLayout.PREFERRED_SIZE, 31, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(jLabel13)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(txttenhienthi1, javax.swing.GroupLayout.PREFERRED_SIZE, 31, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addComponent(txttenhienthi, javax.swing.GroupLayout.PREFERRED_SIZE, 31, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(18, 18, 18)
                 .addComponent(btndangki)
                 .addGap(18, 18, 18)
                 .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(btnlogin)
                     .addComponent(jLabel8))
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-            .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                .addGroup(jPanel2Layout.createSequentialGroup()
-                    .addGap(0, 245, Short.MAX_VALUE)
-                    .addComponent(jLabel12)
-                    .addGap(0, 252, Short.MAX_VALUE)))
+                .addContainerGap(10, Short.MAX_VALUE))
         );
 
         jPanel3.setBackground(new java.awt.Color(153, 255, 204));
@@ -233,30 +219,62 @@ public class frmRegister extends javax.swing.JFrame {
     }// </editor-fold>//GEN-END:initComponents
 
     private void btndangkiActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btndangkiActionPerformed
-        try {
-            String username = txttendangnhap.getText();
-            String password = txtmatkhau.getText();
-            DBAccess acc = new DBAccess();
-            String query = "SELECT * FROM Users WHERE Username = ? AND PasswordHash = ?";
-            PreparedStatement pst = acc.getConnection().prepareStatement(query);
-            pst.setString(1, username);
-            pst.setString(2, password);
+         try {
+        String tenHienThi = txttenhienthi.getText().trim();
+        String email = txtemail.getText().trim();
+        String tenDangNhap = txttendangnhap.getText().trim();
+        String matKhau = new String(txtmatkhau.getPassword()).trim();
+        String xacNhanMK = new String(txtxacnhanmk.getPassword()).trim();
 
-            ResultSet rs = pst.executeQuery();
-
-            if (rs.next()) {
-                JOptionPane.showMessageDialog(this, "Đăng nhập thành công");
-
-                frmChatApp chatapp = new frmChatApp(username);
-                chatapp.setVisible(true);
-                this.dispose();
-            } else {
-                JOptionPane.showMessageDialog(this, "Sai tên đăng nhập hoặc mật khẩu");
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(this, "Đã xảy ra lỗi: " + e.getMessage());
+        // Kiểm tra dữ liệu đầu vào
+        if (tenHienThi.isEmpty() || email.isEmpty() || tenDangNhap.isEmpty() || matKhau.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Vui lòng nhập đầy đủ thông tin!");
+            return;
         }
+
+        if (!matKhau.equals(xacNhanMK)) {
+            JOptionPane.showMessageDialog(this, "Mật khẩu và xác nhận mật khẩu không khớp!");
+            return;
+        }
+
+        // Kiểm tra định dạng email
+        if (!email.matches("^[\\w.%+-]+@[\\w.-]+\\.[a-zA-Z]{2,6}$")) {
+            JOptionPane.showMessageDialog(this, "Email không hợp lệ!");
+            return;
+        }
+
+        // Kiểm tra tên đăng nhập hoặc email đã tồn tại
+        DBAccess db = new DBAccess();
+        String checkQuery = "SELECT * FROM Users WHERE Username = ? OR Email = ?";
+        PreparedStatement checkStmt = (PreparedStatement) db.getConnection().prepareStatement(checkQuery);
+        checkStmt.setString(1, tenDangNhap);
+        checkStmt.setString(2, email);
+
+        ResultSet rs = checkStmt.executeQuery();
+        if (rs.next()) {
+            JOptionPane.showMessageDialog(this, "Tên đăng nhập hoặc email đã tồn tại!");
+            return;
+        }
+
+        // Tạo mã OTP và lưu vào lớp quản lý chung
+        OTPManager.generatedOtp = String.format("%06d", new java.util.Random().nextInt(1000000));
+        OTPManager.otpExpiryTime = System.currentTimeMillis() + 5 * 60 * 1000; // Thời gian hết hạn OTP (5 phút)
+        OTPManager.email = email; // Lưu email để xác nhận sau này
+
+        // Gửi OTP qua email
+        EmailSender.sendEmail(email, "Xác nhận đăng ký",
+                "Mã OTP của bạn là: " + OTPManager.generatedOtp + ". Mã này sẽ hết hạn sau 5 phút.");
+
+        JOptionPane.showMessageDialog(this, "OTP đã được gửi tới email. Vui lòng xác nhận OTP.");
+
+        // Mở form nhập OTP và truyền userId để sử dụng sau này
+        new frmOTP(tenHienThi, tenDangNhap, matKhau).setVisible(true);
+        this.dispose();
+
+    } catch (Exception e) {
+        JOptionPane.showMessageDialog(this, "Lỗi: " + e.getMessage());
+        e.printStackTrace();
+    }
     }//GEN-LAST:event_btndangkiActionPerformed
 
     private void btnloginActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnloginActionPerformed
@@ -303,7 +321,6 @@ public class frmRegister extends javax.swing.JFrame {
     private javax.swing.JButton btnlogin;
     private javax.swing.JLabel jLabel10;
     private javax.swing.JLabel jLabel11;
-    private javax.swing.JLabel jLabel12;
     private javax.swing.JLabel jLabel13;
     private javax.swing.JLabel jLabel6;
     private javax.swing.JLabel jLabel7;
@@ -312,10 +329,10 @@ public class frmRegister extends javax.swing.JFrame {
     private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel2;
     private javax.swing.JPanel jPanel3;
-    private javax.swing.JTextField txtemail2;
+    private javax.swing.JTextField txtemail;
     private javax.swing.JPasswordField txtmatkhau;
     private javax.swing.JTextField txttendangnhap;
-    private javax.swing.JTextField txttenhienthi1;
+    private javax.swing.JTextField txttenhienthi;
     private javax.swing.JPasswordField txtxacnhanmk;
     // End of variables declaration//GEN-END:variables
 }

@@ -3,6 +3,8 @@
  * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
  */
 package chatapp;
+import java.net.Authenticator;
+import java.net.PasswordAuthentication;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.Properties;

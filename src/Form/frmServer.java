@@ -50,6 +50,7 @@ public class frmServer extends javax.swing.JFrame {
         private final Socket clientSocket;
         private PrintWriter out;
         private BufferedReader in;
+        private InputStream clientInputStream;
 
         public ClientHandler(Socket socket) {
             this.clientSocket = socket;
@@ -58,36 +59,68 @@ public class frmServer extends javax.swing.JFrame {
         @Override
         public void run() {
             try {
-                in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                out = new PrintWriter(clientSocket.getOutputStream(), true);
+            in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+            out = new PrintWriter(clientSocket.getOutputStream(), true);
+            clientInputStream = clientSocket.getInputStream();
 
-                String message;
-                while ((message = in.readLine()) != null) {
-                    txaserver.append("Client gửi: " + message + "\n");
+            String message;
+            while ((message = in.readLine()) != null) {
+                if (message.startsWith("IMAGE|")) {
+                    // Xử lý ảnh
+                    String imageName = message.substring(6);  // Lấy tên file ảnh
+                    DataInputStream dataIn = new DataInputStream(clientInputStream);
+                    int imageLength = dataIn.readInt();  // Lấy kích thước ảnh
+                    byte[] imageBytes = new byte[imageLength];
+                    dataIn.readFully(imageBytes);  // Đọc toàn bộ ảnh từ client
+
+                    broadcastImage(imageName, imageBytes);  // Gửi ảnh tới tất cả client
+                } else {
+                    // Gửi tin nhắn văn bản
                     broadcastMessage(message);
                 }
-
-            } catch (IOException e) {
-                txaserver.append("Lỗi với client: " + e.getMessage() + "\n");
-            } finally {
-                try {
-                    clientSocket.close();
-                } catch (IOException e) {
-                    txaserver.append("Lỗi khi đóng kết nối client: " + e.getMessage() + "\n");
-                }
-                clients.remove(this);
             }
+
+        } catch (IOException e) {
+            txaserver.append("Lỗi với client: " + e.getMessage() + "\n");
+        } finally {
+            try {
+                clientSocket.close();
+            } catch (IOException e) {
+                txaserver.append("Lỗi khi đóng kết nối client: " + e.getMessage() + "\n");
+            }
+            clients.remove(this);
+        }
         }
 
         private void broadcastMessage(String message) {
             synchronized (clients) {
-                for (ClientHandler client : clients) {
-                    if (client != this) {
-                        client.out.println(message);
+            for (ClientHandler client : clients) {
+                if (client != this) {
+                    client.out.println(message);
+                }
+            }
+        
+        }
+    }
+        private void broadcastImage(String imageName, byte[] imageBytes) {
+         synchronized (clients) {
+            for (ClientHandler client : clients) {
+                if (client != this) {
+                    // Gửi tên ảnh và nội dung ảnh cho client
+                    client.out.println("IMAGE|"+imageName);
+                    DataOutputStream dataOut;
+                    try {
+                        dataOut = new DataOutputStream(client.clientSocket.getOutputStream());
+                        dataOut.writeInt(imageBytes.length);  // Gửi kích thước ảnh
+                        dataOut.write(imageBytes);  // Gửi ảnh cho client
+                        dataOut.flush();
+                    } catch (IOException e) {
+                        e.printStackTrace();
                     }
                 }
             }
         }
+    }
     }
 
     /**

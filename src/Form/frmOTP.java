@@ -5,17 +5,16 @@
 package Form;
 
 import DB.DBAccess;
-
 import chatapp.EmailSender;
 import Form.frmRegister;
 import chatapp.OTPManager;
-import static chatapp.OTPManager.generatedOtp;
-import javax.swing.JOptionPane;
+import javax.swing.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.security.SecureRandom;
 import java.sql.SQLException;
-import java.util.Random;
+import javax.swing.Timer;
 
 /**
  *
@@ -23,13 +22,15 @@ import java.util.Random;
  */
 public class frmOTP extends javax.swing.JFrame {
     private String tenHienThi, tenDangNhap, matKhau;
-
+     private Timer countdownTimer;
+    private int countdownTime = 5 * 60;
     
     /**
      * Creates new form frmOTP
      */
     public frmOTP() {
         initComponents();
+         startCountdown();
     }
 
      public frmOTP(String tenHienThi, String tenDangNhap, String matKhau) {
@@ -39,7 +40,27 @@ public class frmOTP extends javax.swing.JFrame {
 
         initComponents();
     }
-    
+    private void startCountdown() {
+        countdownTimer = new Timer(1000, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (countdownTime > 0) {
+                    countdownTime--;
+                    updateCountdownLabel();
+                } else {
+                    countdownTimer.stop(); // Stop the timer when countdown reaches 0
+                    JOptionPane.showMessageDialog(null, "Mã OTP đã hết hạn!");
+                }
+            }
+        });
+        countdownTimer.start();
+    }
+    private void updateCountdownLabel() {
+        int minutes = countdownTime / 60;
+        int seconds = countdownTime % 60;
+        String timeText = String.format("Thời gian còn lại: %02d:%02d", minutes, seconds);
+        lblCountdown.setText(timeText); // Assuming lblCountdown is the label showing the countdown
+    }
 
     /**
      * This method is called from within the constructor to initialize the form.
@@ -54,6 +75,7 @@ public class frmOTP extends javax.swing.JFrame {
         btnxacnhan = new javax.swing.JButton();
         btnguilai = new javax.swing.JButton();
         jLabel1 = new javax.swing.JLabel();
+        lblCountdown = new javax.swing.JLabel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
 
@@ -74,24 +96,29 @@ public class frmOTP extends javax.swing.JFrame {
         jLabel1.setFont(new java.awt.Font("Segoe UI", 1, 36)); // NOI18N
         jLabel1.setText("Nhập Mã OTP");
 
+        lblCountdown.setText("jLabel2");
+
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addComponent(jLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, 368, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(72, 72, 72))
             .addGroup(layout.createSequentialGroup()
                 .addGap(104, 104, 104)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(txtotp, javax.swing.GroupLayout.PREFERRED_SIZE, 338, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addGroup(layout.createSequentialGroup()
-                        .addGap(11, 11, 11)
-                        .addComponent(btnxacnhan)
-                        .addGap(158, 158, 158)
-                        .addComponent(btnguilai)))
+                        .addGap(13, 13, 13)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                            .addComponent(lblCountdown, javax.swing.GroupLayout.PREFERRED_SIZE, 196, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addGroup(layout.createSequentialGroup()
+                                .addComponent(btnxacnhan)
+                                .addGap(135, 135, 135)
+                                .addComponent(btnguilai)))))
                 .addContainerGap(134, Short.MAX_VALUE))
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addComponent(jLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, 368, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(64, 64, 64))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -100,11 +127,13 @@ public class frmOTP extends javax.swing.JFrame {
                 .addComponent(jLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, 83, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(18, 18, 18)
                 .addComponent(txtotp, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(30, 30, 30)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 42, Short.MAX_VALUE)
+                .addComponent(lblCountdown, javax.swing.GroupLayout.PREFERRED_SIZE, 29, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(18, 18, 18)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(btnxacnhan)
                     .addComponent(btnguilai))
-                .addContainerGap(58, Short.MAX_VALUE))
+                .addGap(43, 43, 43))
         );
 
         pack();
@@ -150,18 +179,17 @@ public class frmOTP extends javax.swing.JFrame {
     }//GEN-LAST:event_btnxacnhanActionPerformed
 
     private void btnguilaiActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnguilaiActionPerformed
-        
-        try {
+       try {
         // Tạo lại OTP mới
         String newOtp = String.format("%06d", new java.util.Random().nextInt(1000000));
         OTPManager.generatedOtp = newOtp; // Cập nhật mã OTP mới
         OTPManager.otpExpiryTime = System.currentTimeMillis() + 5 * 60 * 1000; // Đặt lại thời gian hết hạn (5 phút)
 
-        // Lấy email người dùng từ cơ sở dữ liệu (dựa trên tên đăng nhập hoặc thông tin khác)
+        // Lấy email người dùng từ cơ sở dữ liệu
         DBAccess db = new DBAccess();
         String query = "SELECT Email FROM Users WHERE Username = ?";
         PreparedStatement stmt = db.getConnection().prepareStatement(query);
-        stmt.setString(1, tenDangNhap);  // Lấy email theo tên đăng nhập
+        stmt.setString(1, tenDangNhap);
         ResultSet rs = stmt.executeQuery();
 
         if (rs.next()) {
@@ -172,6 +200,7 @@ public class frmOTP extends javax.swing.JFrame {
 
             // Thông báo đã gửi OTP mới
             JOptionPane.showMessageDialog(this, "Mã OTP mới đã được gửi đến email của bạn!");
+            startCountdown(); // Bắt đầu đếm ngược khi gửi lại OTP
 
         } else {
             JOptionPane.showMessageDialog(this, "Không tìm thấy email người dùng!");
@@ -222,6 +251,7 @@ public class frmOTP extends javax.swing.JFrame {
     private javax.swing.JButton btnguilai;
     private javax.swing.JButton btnxacnhan;
     private javax.swing.JLabel jLabel1;
+    private javax.swing.JLabel lblCountdown;
     private javax.swing.JTextField txtotp;
     // End of variables declaration//GEN-END:variables
 

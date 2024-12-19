@@ -22,7 +22,12 @@ import javax.swing.text.SimpleAttributeSet;
 import javax.swing.text.Style;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyledDocument;
-
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.io.*;
+import java.sql.ResultSet;
 /**
  *
  * @author DELL
@@ -37,6 +42,8 @@ public class frmChatApp extends javax.swing.JFrame {
      private DataInputStream dataIn;
     private DataOutputStream dataOut;
     private File imageFile;
+    private Connection connection;
+    
 
     /**
      * Creates new form frmChatApp
@@ -47,6 +54,8 @@ public class frmChatApp extends javax.swing.JFrame {
         txtusername.setText(username);
 
         connectToServer();
+         connectToDatabase();
+         loadMessagesFromDatabase();
         btngui.addActionListener(evt -> sendMessage());
     }
 
@@ -54,9 +63,64 @@ public class frmChatApp extends javax.swing.JFrame {
         initComponents();
         this.username = username;
         txtusername.setText(username);
-
+        
         connectToServer();
+         connectToDatabase();
         btngui.addActionListener(evt -> sendMessage());
+    }
+    
+    
+    private void connectToDatabase() {
+        try {
+            // Thông tin kết nối tới MySQL
+            String url = "jdbc:mysql://localhost:3306/chatapp";  // Đổi với tên cơ sở dữ liệu của bạn
+            String user = "root";  // Đổi với tên người dùng MySQL của bạn
+            String password = "";  // Đổi với mật khẩu MySQL của bạn
+            connection = DriverManager.getConnection(url, user, password);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+    private void loadMessagesFromDatabase() {
+        try {
+            String sql = "SELECT m.Content, m.CreatedAt, u.Username " +
+                         "FROM Messages m " +
+                         "JOIN Users u ON m.SenderID = u.UserID " +
+                         "ORDER BY m.CreatedAt";
+
+            PreparedStatement preparedStatement = connection.prepareStatement(sql);
+            ResultSet resultSet = preparedStatement.executeQuery();
+
+            while (resultSet.next()) {
+                String message = resultSet.getString("Content");
+                String timestamp = resultSet.getString("CreatedAt");
+                String sender = resultSet.getString("Username");
+                String fullMessage = String.format("[%s] %s: %s", timestamp, sender, message);
+                appendMessage(fullMessage, false);  // Hiển thị tin nhắn lên giao diện
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+    private void saveMessageToDatabase(String message) {
+        try {
+            // Giả sử bạn lấy ID của người gửi và người nhận từ đâu đó
+            // Ví dụ: Người gửi và người nhận là các ID tĩnh cho đơn giản
+            int senderID = 1;  // Thay thế bằng ID người gửi thực tế
+            int receiverID = 2;  // Thay thế bằng ID người nhận thực tế
+            
+            // Câu lệnh SQL để chèn tin nhắn vào cơ sở dữ liệu
+            String sql = "INSERT INTO Messages (SenderID, ReceiverID, Content) VALUES (?, ?, ?)";
+            PreparedStatement preparedStatement = connection.prepareStatement(sql);
+            preparedStatement.setInt(1, senderID);  // Gán ID người gửi
+            preparedStatement.setInt(2, receiverID);  // Gán ID người nhận
+            preparedStatement.setString(3, message);  // Gán nội dung tin nhắn
+            
+            // Thực thi câu lệnh SQL
+            preparedStatement.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 
     private void connectToServer() {
@@ -93,14 +157,20 @@ public class frmChatApp extends javax.swing.JFrame {
 
     private void sendMessage() {
         String message = txtchat.getText().trim();
-    if (!message.isEmpty()) {
-        String timestamp = getTimestamp();
-        String fullMessage = String.format("[%s] %s: %s", timestamp, username, message);
-        out.println(fullMessage);
-        appendMessage(fullMessage, true);
-        txtchat.setText("");
+        if (!message.isEmpty()) {
+            String timestamp = getTimestamp();
+            String fullMessage = String.format("[%s] %s: %s", timestamp, username, message);
+            out.println(fullMessage);  // Gửi tin nhắn qua socket
+            appendMessage(fullMessage, true);  // Hiển thị tin nhắn lên giao diện
+
+            // Lưu tin nhắn vào cơ sở dữ liệu
+            saveMessageToDatabase(fullMessage);
+
+            txtchat.setText("");  // Xóa hộp thoại nhập tin nhắn
+        }
     }
-    }
+    
+    
 
     private void receiveImage(String currentMessage) {
         try {

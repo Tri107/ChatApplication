@@ -4,6 +4,7 @@
  */
 package Form;
 
+import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Image;
 import java.awt.event.MouseAdapter;
@@ -28,6 +29,9 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.io.*;
 import java.sql.ResultSet;
+import javax.swing.*;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
 /**
  *
  * @author DELL
@@ -43,8 +47,10 @@ public class frmChatApp extends javax.swing.JFrame {
     private DataOutputStream dataOut;
     private File imageFile;
     private Connection connection;
-    
-
+    private DefaultListModel<String> userListModel;
+    private JList<String> userList;
+    private JTextPane chatPane;
+   
     /**
      * Creates new form frmChatApp
      */
@@ -52,23 +58,101 @@ public class frmChatApp extends javax.swing.JFrame {
         initComponents();
         this.username = username;
         txtusername.setText(username);
+         
+        userListModel = new DefaultListModel<>();
+       userList = new JList<>(userListModel);
+        JScrollPane userListScrollPane = new JScrollPane(userList);
+        getContentPane().add(userListScrollPane, BorderLayout.WEST); 
 
-        connectToServer();
-         connectToDatabase();
-         loadMessagesFromDatabase();
-        btngui.addActionListener(evt -> sendMessage());
+    // Khởi tạo chatPane và đảm bảo nó không null
+    chatPane = new JTextPane();
+    chatPane.setEditable(false);  // Không cho phép chỉnh sửa
+    
+    JScrollPane chatScrollPane = new JScrollPane(chatPane);
+    getContentPane().add(chatScrollPane, BorderLayout.CENTER);
+
+    connectToServer();
+    connectToDatabase();
+    loadMessagesFromDatabase();
+
+    btngui.addActionListener(evt -> sendMessage());
+    userList.addListSelectionListener(new ListSelectionListener() {
+    @Override
+    public void valueChanged(ListSelectionEvent e) {
+        if (!e.getValueIsAdjusting()) {  // Kiểm tra nếu sự kiện đã được xử lý hoàn toàn
+            String selectedUser = userList.getSelectedValue();  // Lấy tên người nhận từ JList
+            if (selectedUser != null) {
+                // Cập nhật tên người nhận vào JTextField
+                txtnguoinhan.setText("Người nhận: " + selectedUser);
+            } else {
+                txtnguoinhan.setText("");  // Nếu không có người nhận nào được chọn, xóa tên
+            }
+        }
     }
+});
+ }
 
     public frmChatApp() {
         initComponents();
         this.username = username;
         txtusername.setText(username);
         
+        chatPane = new JTextPane();
+       chatPane.setEditable(false);  // Make it non-editable
+       JScrollPane chatScrollPane = new JScrollPane(chatPane);
+       getContentPane().add(chatScrollPane, BorderLayout.CENTER);
         connectToServer();
          connectToDatabase();
         btngui.addActionListener(evt -> sendMessage());
+        userList.addListSelectionListener(new ListSelectionListener() {
+    @Override
+    public void valueChanged(ListSelectionEvent e) {
+        if (!e.getValueIsAdjusting()) {  // Kiểm tra nếu sự kiện đã được xử lý hoàn toàn
+            String selectedUser = userList.getSelectedValue();  // Lấy tên người nhận từ JList
+            if (selectedUser != null) {
+                // Cập nhật tên người nhận vào JTextField
+                txtnguoinhan.setText("Người nhận: " + selectedUser);
+            } else {
+                txtnguoinhan.setText("");  // Nếu không có người nhận nào được chọn, xóa tên
+            }
+        }
+    }
+});
     }
     
+   
+    
+
+    
+
+   private void loadMessagesForUser(String selectedUser) {
+    try {
+        chatPane.setText("");  // Clear previous chat
+        String sql = "SELECT m.Content, m.CreatedAt, u.Username FROM Messages m " +
+                     "JOIN Users u ON m.SenderID = u.UserID WHERE (m.SenderID = ? OR m.ReceiverID = ?) " +
+                     "AND (m.ReceiverID = ? OR m.SenderID = ?) ORDER BY m.CreatedAt";
+        PreparedStatement preparedStatement = connection.prepareStatement(sql);
+        preparedStatement.setString(1, username);  // Sender ID
+        preparedStatement.setString(2, selectedUser); // Receiver ID
+        preparedStatement.setString(3, selectedUser);
+        preparedStatement.setString(4, username); // Receiver ID
+        ResultSet resultSet = preparedStatement.executeQuery();
+
+        while (resultSet.next()) {
+            String message = resultSet.getString("Content");
+            String timestamp = resultSet.getString("CreatedAt");
+            String sender = resultSet.getString("Username");
+            String fullMessage = String.format("[%s] %s: %s", timestamp, sender, message);
+            appendMessage(fullMessage, sender.equals(username));
+        }
+    } catch (SQLException e) {
+        e.printStackTrace();
+    }
+}
+
+
+
+
     
     private void connectToDatabase() {
         try {
@@ -81,95 +165,144 @@ public class frmChatApp extends javax.swing.JFrame {
             e.printStackTrace();
         }
     }
-    private void loadMessagesFromDatabase() {
-        try {
-            String sql = "SELECT m.Content, m.CreatedAt, u.Username " +
-                         "FROM Messages m " +
-                         "JOIN Users u ON m.SenderID = u.UserID " +
-                         "ORDER BY m.CreatedAt";
-
-            PreparedStatement preparedStatement = connection.prepareStatement(sql);
-            ResultSet resultSet = preparedStatement.executeQuery();
-
-            while (resultSet.next()) {
-                String message = resultSet.getString("Content");
-                String timestamp = resultSet.getString("CreatedAt");
-                String sender = resultSet.getString("Username");
-                String fullMessage = String.format("[%s] %s: %s", timestamp, sender, message);
-                appendMessage(fullMessage, false);  // Hiển thị tin nhắn lên giao diện
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-    }
-    private void saveMessageToDatabase(String message) {
-        try {
-            // Giả sử bạn lấy ID của người gửi và người nhận từ đâu đó
-            // Ví dụ: Người gửi và người nhận là các ID tĩnh cho đơn giản
-            int senderID = 1;  // Thay thế bằng ID người gửi thực tế
-            int receiverID = 2;  // Thay thế bằng ID người nhận thực tế
-            
-            // Câu lệnh SQL để chèn tin nhắn vào cơ sở dữ liệu
-            String sql = "INSERT INTO Messages (SenderID, ReceiverID, Content) VALUES (?, ?, ?)";
-            PreparedStatement preparedStatement = connection.prepareStatement(sql);
-            preparedStatement.setInt(1, senderID);  // Gán ID người gửi
-            preparedStatement.setInt(2, receiverID);  // Gán ID người nhận
-            preparedStatement.setString(3, message);  // Gán nội dung tin nhắn
-            
-            // Thực thi câu lệnh SQL
-            preparedStatement.executeUpdate();
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void connectToServer() {
-   try {
-            socket = new Socket("localhost", 8386);
-            out = new PrintWriter(socket.getOutputStream(), true);
-            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            // Khởi tạo DataInputStream và DataOutputStream
-            dataIn = new DataInputStream(socket.getInputStream());
-            dataOut = new DataOutputStream(socket.getOutputStream());
-
-            Thread receiveThread = new Thread(() -> {
+   private void loadMessagesFromDatabase() {
     try {
-        String currentMessage;
-        while ((currentMessage = in.readLine()) != null) {
-            if (currentMessage.startsWith("IMAGE|")) {
-                receiveImage(currentMessage);
-            } else if (currentMessage.startsWith("FILE|")) {
-                receiveFile();
-            } else {
-                appendMessage(currentMessage, false);
-            }
-        }
-    } catch (IOException e) {
-        appendMessage("Lỗi khi nhận tin nhắn: " + e.getMessage(), false);
-    }
-});
-            receiveThread.start();
-        } catch (IOException e) {
-            appendMessage("Không thể kết nối tới server: " + e.getMessage(), false);
-        }
+        // Sửa tên cột 'MessageContent' thành 'Content'
+        String sql = "SELECT m.Content, m.CreatedAt, u.Username " +
+                     "FROM Messages m " +
+                     "JOIN Users u ON m.SenderID = u.UserID " +
+                     "ORDER BY m.CreatedAt";
 
+        PreparedStatement preparedStatement = connection.prepareStatement(sql);
+        ResultSet resultSet = preparedStatement.executeQuery();
+
+        while (resultSet.next()) {
+            String message = resultSet.getString("Content");  // Đổi thành 'Content'
+            String timestamp = resultSet.getString("CreatedAt");
+            String sender = resultSet.getString("Username");
+            String fullMessage = String.format("[%s] %s: %s", timestamp, sender, message);
+            appendMessage(fullMessage, false);  // Hiển thị tin nhắn lên giao diện
+        }
+    } catch (SQLException e) {
+        e.printStackTrace();
+    }
 }
 
-    private void sendMessage() {
-        String message = txtchat.getText().trim();
-        if (!message.isEmpty()) {
-            String timestamp = getTimestamp();
-            String fullMessage = String.format("[%s] %s: %s", timestamp, username, message);
-            out.println(fullMessage);  // Gửi tin nhắn qua socket
-            appendMessage(fullMessage, true);  // Hiển thị tin nhắn lên giao diện
-
-            // Lưu tin nhắn vào cơ sở dữ liệu
-            saveMessageToDatabase(fullMessage);
-
-            txtchat.setText("");  // Xóa hộp thoại nhập tin nhắn
-        }
+   private void saveMessageToDatabase(String message, String receiverId) {
+    try {
+        // Sử dụng cột 'Content' thay vì 'MessageContent'
+        String sql = "INSERT INTO Messages (SenderID, ReceiverID, Content, Timestamp) VALUES (?, ?, ?, ?)";
+        PreparedStatement preparedStatement = connection.prepareStatement(sql);
+        preparedStatement.setString(1, username);  // Giả sử `username` là ID của người gửi
+        preparedStatement.setString(2, receiverId);  // ID của người nhận
+        preparedStatement.setString(3, message);     // Nội dung tin nhắn
+        preparedStatement.setString(4, getTimestamp());  // Giả sử có phương thức `getTimestamp()` để lấy thời gian
+        preparedStatement.executeUpdate();
+    } catch (SQLException e) {
+        e.printStackTrace();
     }
+}
+
+
+
     
+    
+
+    private void connectToServer() {
+    try {
+        socket = new Socket("localhost", 8386);
+        out = new PrintWriter(socket.getOutputStream(), true);
+        in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        // Khởi tạo DataInputStream và DataOutputStream
+        dataIn = new DataInputStream(socket.getInputStream());
+        dataOut = new DataOutputStream(socket.getOutputStream());
+
+        Thread receiveThread = new Thread(() -> {
+            try {
+                String currentMessage;
+                while ((currentMessage = in.readLine()) != null) {
+                    // Nếu tin nhắn có chứa thông tin của người nhận, xử lý riêng
+                    if (currentMessage.startsWith("MESSAGE|")) {
+                        String messageContent = currentMessage.substring(8); // Lấy nội dung tin nhắn
+                        appendMessage(messageContent, false); // Hiển thị tin nhắn
+                    } else {
+                        appendMessage("Lỗi: Tin nhắn không hợp lệ.", false);
+                    }
+                }
+            } catch (IOException e) {
+                appendMessage("Lỗi khi nhận tin nhắn: " + e.getMessage(), false);
+            }
+        });
+        receiveThread.start();
+    } catch (IOException e) {
+        appendMessage("Không thể kết nối tới server: " + e.getMessage(), false);
+    }
+}
+
+
+    private void sendMessage() {
+    String message = txtchat.getText().trim();  // Lấy nội dung tin nhắn
+    String selectedUser = userList.getSelectedValue();  // Lấy người nhận từ JList
+
+    // Kiểm tra nếu không có người nhận nào được chọn hoặc tin nhắn trống
+    if (selectedUser == null || selectedUser.isEmpty()) {
+        JOptionPane.showMessageDialog(this, "Vui lòng chọn người nhận.", "Lỗi", JOptionPane.WARNING_MESSAGE);
+        return;  // Không gửi tin nhắn nếu không chọn người nhận
+    }
+
+    if (message.isEmpty()) {
+        JOptionPane.showMessageDialog(this, "Vui lòng nhập tin nhắn.", "Lỗi", JOptionPane.WARNING_MESSAGE);
+        return;  // Không gửi tin nhắn nếu tin nhắn rỗng
+    }
+
+    // Tiến hành gửi tin nhắn nếu người nhận đã được chọn và tin nhắn không trống
+    String receiverId = getReceiverId(selectedUser);  // Lấy ID người nhận từ cơ sở dữ liệu
+    if (receiverId != null) {
+        String timestamp = getTimestamp();  // Lấy thời gian gửi tin nhắn
+        String fullMessage = String.format("[%s] %s: %s", timestamp, username, message);
+
+        // Gửi tin nhắn đến server qua socket
+        out.println(fullMessage);
+
+        // Hiển thị tin nhắn trên giao diện người gửi
+        appendMessage(fullMessage, true);  // Giả sử appendMessage là phương thức hiển thị tin nhắn
+
+        // Lưu tin nhắn vào cơ sở dữ liệu
+        saveMessageToDatabase(fullMessage, receiverId);
+
+        // Xóa nội dung trong hộp nhập tin nhắn
+        txtchat.setText("");
+    } else {
+        JOptionPane.showMessageDialog(this, "Không tìm thấy người nhận.", "Lỗi", JOptionPane.ERROR_MESSAGE);
+    }
+}
+
+
+
+
+
+
+
+
+
+   private String getReceiverId(String selectedUser) {
+    try {
+        String sql = "SELECT UserID FROM Users WHERE Username = ?";
+        PreparedStatement preparedStatement = connection.prepareStatement(sql);
+        preparedStatement.setString(1, selectedUser);
+        ResultSet resultSet = preparedStatement.executeQuery();
+
+        if (resultSet.next()) {
+            return resultSet.getString("UserID");  // Trả về UserID của người nhận
+        }
+    } catch (SQLException e) {
+        e.printStackTrace();
+    }
+    return null;  // Nếu không tìm thấy người nhận
+}
+
+
+
     
 
     private void receiveImage(String currentMessage) {
@@ -198,11 +331,13 @@ public class frmChatApp extends javax.swing.JFrame {
     }
 
     private void appendMessage(String message, boolean isSender) {
-       try {
-        StyledDocument doc = txpboxchat.getStyledDocument();
-        
+    try {
+        StyledDocument doc = chatPane.getStyledDocument();
+
         // Create a new style for the message
-        Style messageStyle = txpboxchat.addStyle("MessageStyle", null);
+        Style messageStyle = chatPane.addStyle("MessageStyle", null);
+        
+        
         
         // Set alignment based on sender/receiver
         SimpleAttributeSet alignment = new SimpleAttributeSet();
@@ -231,12 +366,14 @@ public class frmChatApp extends javax.swing.JFrame {
         doc.insertString(doc.getLength(), message + "\n", messageStyle);
         
         // Scroll to the bottom
-        txpboxchat.setCaretPosition(doc.getLength());
+        chatPane.setCaretPosition(doc.getLength());
         
     } catch (BadLocationException e) {
         e.printStackTrace();
     }
-    }
+}
+
+
     private String getTimestamp() {
     SimpleDateFormat sdf = new SimpleDateFormat("HH:mm");
     return sdf.format(new Date());
@@ -401,6 +538,7 @@ public class frmChatApp extends javax.swing.JFrame {
     }
 }
 
+
     /**
      * This method is called from within the constructor to initialize the form.
      * WARNING: Do NOT modify this code. The content of this method is always
@@ -412,9 +550,9 @@ public class frmChatApp extends javax.swing.JFrame {
 
         jPanel1 = new javax.swing.JPanel();
         jLabel1 = new javax.swing.JLabel();
-        jScrollPane3 = new javax.swing.JScrollPane();
-        jList1 = new javax.swing.JList<>();
         txtusername = new javax.swing.JLabel();
+        jScrollPane1 = new javax.swing.JScrollPane();
+        jList2 = new javax.swing.JList<>();
         jPanel2 = new javax.swing.JPanel();
         jScrollPane2 = new javax.swing.JScrollPane();
         txtchat = new javax.swing.JTextArea();
@@ -423,7 +561,7 @@ public class frmChatApp extends javax.swing.JFrame {
         btnimage = new javax.swing.JButton();
         btnfile = new javax.swing.JButton();
         jPanel3 = new javax.swing.JPanel();
-        jTextField1 = new javax.swing.JTextField();
+        txtnguoinhan = new javax.swing.JTextField();
         btndownload = new javax.swing.JButton();
         jScrollPane4 = new javax.swing.JScrollPane();
         txpboxchat = new javax.swing.JTextPane();
@@ -435,15 +573,20 @@ public class frmChatApp extends javax.swing.JFrame {
         jLabel1.setFont(new java.awt.Font("Segoe UI", 1, 18)); // NOI18N
         jLabel1.setText("Icon");
 
-        jList1.setFont(new java.awt.Font("Segoe UI", 1, 36)); // NOI18N
-        jList1.setModel(new javax.swing.AbstractListModel<String>() {
-            String[] strings = { "A", "B", "C", "D", "E" };
+        txtusername.setText("jLabel2");
+
+        jList2.setFont(new java.awt.Font("Segoe UI", 1, 24)); // NOI18N
+        jList2.setModel(new javax.swing.AbstractListModel<String>() {
+            String[] strings = { "Nguyễn Công Vinh\t", "Nguyễn Minh Trí", "Nguyễn Long Vũ" };
             public int getSize() { return strings.length; }
             public String getElementAt(int i) { return strings[i]; }
         });
-        jScrollPane3.setViewportView(jList1);
-
-        txtusername.setText("jLabel2");
+        jList2.addListSelectionListener(new javax.swing.event.ListSelectionListener() {
+            public void valueChanged(javax.swing.event.ListSelectionEvent evt) {
+                jList2ValueChanged(evt);
+            }
+        });
+        jScrollPane1.setViewportView(jList2);
 
         javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
         jPanel1.setLayout(jPanel1Layout);
@@ -451,11 +594,13 @@ public class frmChatApp extends javax.swing.JFrame {
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel1Layout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(jLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, 65, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(18, 18, 18)
-                .addComponent(txtusername)
-                .addContainerGap(150, Short.MAX_VALUE))
-            .addComponent(jScrollPane3, javax.swing.GroupLayout.Alignment.TRAILING)
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(jScrollPane1)
+                    .addGroup(jPanel1Layout.createSequentialGroup()
+                        .addComponent(jLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, 65, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGap(18, 18, 18)
+                        .addComponent(txtusername)
+                        .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))))
         );
         jPanel1Layout.setVerticalGroup(
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -466,7 +611,7 @@ public class frmChatApp extends javax.swing.JFrame {
                         .addContainerGap()
                         .addComponent(txtusername)))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(jScrollPane3, javax.swing.GroupLayout.DEFAULT_SIZE, 556, Short.MAX_VALUE))
+                .addComponent(jScrollPane1))
         );
 
         jPanel2.setBackground(new java.awt.Color(255, 255, 255));
@@ -504,9 +649,14 @@ public class frmChatApp extends javax.swing.JFrame {
             .addGap(0, 48, Short.MAX_VALUE)
         );
 
-        jTextField1.setText("Tên Người Nhận");
+        txtnguoinhan.setText("Tên Người Nhận");
 
         btndownload.setText("download");
+        btndownload.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btndownloadActionPerformed(evt);
+            }
+        });
 
         jScrollPane4.setViewportView(txpboxchat);
 
@@ -521,7 +671,7 @@ public class frmChatApp extends javax.swing.JFrame {
                     .addGroup(jPanel2Layout.createSequentialGroup()
                         .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addGroup(jPanel2Layout.createSequentialGroup()
-                                .addComponent(jScrollPane2, javax.swing.GroupLayout.DEFAULT_SIZE, 386, Short.MAX_VALUE)
+                                .addComponent(jScrollPane2, javax.swing.GroupLayout.DEFAULT_SIZE, 430, Short.MAX_VALUE)
                                 .addGap(18, 18, 18)
                                 .addComponent(btngui, javax.swing.GroupLayout.PREFERRED_SIZE, 114, javax.swing.GroupLayout.PREFERRED_SIZE))
                             .addGroup(jPanel2Layout.createSequentialGroup()
@@ -529,7 +679,7 @@ public class frmChatApp extends javax.swing.JFrame {
                                     .addGroup(jPanel2Layout.createSequentialGroup()
                                         .addComponent(jPanel3, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                                        .addComponent(jTextField1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                        .addComponent(txtnguoinhan, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                                     .addGroup(jPanel2Layout.createSequentialGroup()
                                         .addComponent(jButton2)
                                         .addGap(18, 18, 18)
@@ -547,7 +697,7 @@ public class frmChatApp extends javax.swing.JFrame {
                 .addContainerGap()
                 .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
                     .addComponent(jPanel3, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(jTextField1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addComponent(txtnguoinhan, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(jScrollPane4, javax.swing.GroupLayout.PREFERRED_SIZE, 479, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
@@ -581,7 +731,7 @@ public class frmChatApp extends javax.swing.JFrame {
                 .addContainerGap())
             .addGroup(layout.createSequentialGroup()
                 .addComponent(jPanel2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(0, 0, Short.MAX_VALUE))
+                .addGap(0, 20, Short.MAX_VALUE))
         );
 
         pack();
@@ -600,6 +750,14 @@ public class frmChatApp extends javax.swing.JFrame {
     private void btnimageActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnimageActionPerformed
         chooseAndSendImage();
     }//GEN-LAST:event_btnimageActionPerformed
+
+    private void btndownloadActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btndownloadActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_btndownloadActionPerformed
+
+    private void jList2ValueChanged(javax.swing.event.ListSelectionEvent evt) {//GEN-FIRST:event_jList2ValueChanged
+        // TODO add your handling code here:
+    }//GEN-LAST:event_jList2ValueChanged
 
     /**
      * @param args the command line arguments
@@ -643,16 +801,16 @@ public class frmChatApp extends javax.swing.JFrame {
     private javax.swing.JButton btnimage;
     private javax.swing.JButton jButton2;
     private javax.swing.JLabel jLabel1;
-    private javax.swing.JList<String> jList1;
+    private javax.swing.JList<String> jList2;
     private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel2;
     private javax.swing.JPanel jPanel3;
+    private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JScrollPane jScrollPane2;
-    private javax.swing.JScrollPane jScrollPane3;
     private javax.swing.JScrollPane jScrollPane4;
-    private javax.swing.JTextField jTextField1;
     private javax.swing.JTextPane txpboxchat;
     private javax.swing.JTextArea txtchat;
+    private javax.swing.JTextField txtnguoinhan;
     private javax.swing.JLabel txtusername;
     // End of variables declaration//GEN-END:variables
 }

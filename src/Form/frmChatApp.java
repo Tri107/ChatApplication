@@ -6,13 +6,19 @@ package Form;
 
 import java.awt.Color;
 import java.awt.Image;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.io.*;
 import java.net.*;
 import java.nio.file.Files;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import javax.swing.ImageIcon;
 import javax.swing.JFileChooser;
+import javax.swing.JOptionPane;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.text.BadLocationException;
+import javax.swing.text.SimpleAttributeSet;
 import javax.swing.text.Style;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyledDocument;
@@ -21,12 +27,16 @@ import javax.swing.text.StyledDocument;
  *
  * @author DELL
  */
+
 public class frmChatApp extends javax.swing.JFrame {
 
     private String username;
     private Socket socket;
     private PrintWriter out;
     private BufferedReader in;
+     private DataInputStream dataIn;
+    private DataOutputStream dataOut;
+    private File imageFile;
 
     /**
      * Creates new form frmChatApp
@@ -50,138 +60,276 @@ public class frmChatApp extends javax.swing.JFrame {
     }
 
     private void connectToServer() {
-        try {
+   try {
             socket = new Socket("localhost", 8386);
             out = new PrintWriter(socket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            // Khởi tạo DataInputStream và DataOutputStream
+            dataIn = new DataInputStream(socket.getInputStream());
+            dataOut = new DataOutputStream(socket.getOutputStream());
 
             Thread receiveThread = new Thread(() -> {
     try {
-        String message;
-        while ((message = in.readLine()) != null) {
-            if (message.startsWith("IMAGE|")) {
-                String imageName = message.substring(6); // Loại bỏ "IMAGE|"
-                receiveImage(imageName); // Gọi hàm nhận ảnh
+        String currentMessage;
+        while ((currentMessage = in.readLine()) != null) {
+            if (currentMessage.startsWith("IMAGE|")) {
+                receiveImage(currentMessage);
+            } else if (currentMessage.startsWith("FILE|")) {
+                receiveFile();
             } else {
-                appendMessage(message, false); // Truyền false vì đây là tin nhắn từ đối phương
+                appendMessage(currentMessage, false);
             }
         }
     } catch (IOException e) {
-        appendMessage("Lỗi nhận tin nhắn: " + e.getMessage(), false); // Sửa lại để truyền tham số thứ hai
+        appendMessage("Lỗi khi nhận tin nhắn: " + e.getMessage(), false);
     }
 });
-receiveThread.start();
+            receiveThread.start();
         } catch (IOException e) {
-            appendMessage("Không thể kết nối tới server: " + e.getMessage(),false);
+            appendMessage("Không thể kết nối tới server: " + e.getMessage(), false);
         }
-    }
+
+}
 
     private void sendMessage() {
         String message = txtchat.getText().trim();
-        if (!message.isEmpty()) {
-            out.println(username + ": " + message);
-            appendMessage(username + ": " + message, true); // Hiển thị tin nhắn của người gửi
-            txtchat.setText(""); // Xóa ô nhập
-        }
+    if (!message.isEmpty()) {
+        String timestamp = getTimestamp();
+        String fullMessage = String.format("[%s] %s: %s", timestamp, username, message);
+        out.println(fullMessage);
+        appendMessage(fullMessage, true);
+        txtchat.setText("");
+    }
     }
 
-    private void receiveImage(String imageName) {
+    private void receiveImage(String currentMessage) {
         try {
-            DataInputStream dataIn = new DataInputStream(socket.getInputStream());
-            int imageLength = dataIn.readInt();
-            byte[] imageBytes = new byte[imageLength];
-            dataIn.readFully(imageBytes);  // Đọc toàn bộ ảnh từ server
-            displayImageInChat(imageBytes, false); // Hiển thị ảnh trong chat
-        } catch (IOException e) {
-            appendMessage("Lỗi khi nhận ảnh: " + e.getMessage(), false);
+        long imageSize = dataIn.readLong();
+        String imageName = dataIn.readUTF();
+        byte[] imageData = new byte[(int) imageSize];
+        int bytesRead = 0;
+
+        while (bytesRead < imageSize) {
+            int result = dataIn.read(imageData, bytesRead, (int) imageSize - bytesRead);
+            if (result == -1) break;
+            bytesRead += result;
         }
+
+        if (bytesRead != imageSize) {
+            appendMessage("Lỗi: Dữ liệu ảnh không đầy đủ.", false);
+            return;
+        }
+
+        String senderName = currentMessage.substring(6);
+        displayImageInChat(imageData, false, senderName);
+    } catch (IOException e) {
+        appendMessage("Lỗi khi nhận ảnh: " + e.getMessage(), false);
+    }
     }
 
     private void appendMessage(String message, boolean isSender) {
-        try {
-            // Lấy StyledDocument từ JTextPane
-            StyledDocument doc = txpboxchat.getStyledDocument();
-
-            // Tạo style mới cho văn bản
-            Style style = txpboxchat.addStyle("Default", null);
-            if (isSender) {
-                // Tin nhắn của người gửi sẽ nằm bên phải
-                StyleConstants.setAlignment(style, StyleConstants.ALIGN_RIGHT);
-                StyleConstants.setForeground(style, Color.BLUE); // Màu xanh cho người gửi
-            } else {
-                // Tin nhắn của đối phương sẽ nằm bên trái
-                StyleConstants.setAlignment(style, StyleConstants.ALIGN_LEFT);
-                StyleConstants.setForeground(style, Color.BLACK); // Màu đen cho đối phương
-            }
-
-            // Chèn văn bản vào JTextPane
-            doc.insertString(doc.getLength(), message + "\n", style);
-        } catch (BadLocationException e) {
-            e.printStackTrace();
+       try {
+        StyledDocument doc = txpboxchat.getStyledDocument();
+        
+        // Create a new style for the message
+        Style messageStyle = txpboxchat.addStyle("MessageStyle", null);
+        
+        // Set alignment based on sender/receiver
+        SimpleAttributeSet alignment = new SimpleAttributeSet();
+        if (isSender) {
+            StyleConstants.setAlignment(alignment, StyleConstants.ALIGN_RIGHT);
+            StyleConstants.setForeground(messageStyle, new Color(0, 102, 204));  // Dark blue for sender
+            StyleConstants.setBackground(messageStyle, new Color(232, 240, 254)); // Light blue background
+        } else {
+            StyleConstants.setAlignment(alignment, StyleConstants.ALIGN_LEFT);
+            StyleConstants.setForeground(messageStyle, new Color(51, 51, 51));   // Dark gray for receiver
+            StyleConstants.setBackground(messageStyle, new Color(241, 241, 241)); // Light gray background
         }
+        
+        // Create padding and margin
+        StyleConstants.setSpaceAbove(messageStyle, 5.0f);
+        StyleConstants.setSpaceBelow(messageStyle, 5.0f);
+        StyleConstants.setLeftIndent(messageStyle, isSender ? 100.0f : 10.0f);
+        StyleConstants.setRightIndent(messageStyle, isSender ? 10.0f : 100.0f);
+        StyleConstants.setFontFamily(messageStyle, "Segoe UI");
+        StyleConstants.setFontSize(messageStyle, 14);
+        
+        // Apply alignment to the paragraph
+        doc.setParagraphAttributes(doc.getLength(), 1, alignment, false);
+        
+        // Insert message with style
+        doc.insertString(doc.getLength(), message + "\n", messageStyle);
+        
+        // Scroll to the bottom
+        txpboxchat.setCaretPosition(doc.getLength());
+        
+    } catch (BadLocationException e) {
+        e.printStackTrace();
+    }
+    }
+    private String getTimestamp() {
+    SimpleDateFormat sdf = new SimpleDateFormat("HH:mm");
+    return sdf.format(new Date());
+}
+
+    private void sendImage(File imageFile) {
+   if (imageFile == null || !imageFile.exists() || imageFile.length() == 0) {
+        JOptionPane.showMessageDialog(this, "File không tồn tại hoặc rỗng.");
+        return;
     }
 
-    private void sendImage(String filePath) {
-        try {
-            File imageFile = new File(filePath);
-            byte[] imageBytes = Files.readAllBytes(imageFile.toPath());
+    try (FileInputStream fileInputStream = new FileInputStream(imageFile)) {
+        byte[] imageBytes = new byte[(int) imageFile.length()];
+        int bytesRead = fileInputStream.read(imageBytes);
 
-            out.println("IMAGE|");  // Gửi tín hiệu ảnh
-            out.flush();
-
-            DataOutputStream dataOut = new DataOutputStream(socket.getOutputStream());
-            dataOut.writeInt(imageBytes.length);  // Gửi kích thước ảnh
-            dataOut.write(imageBytes);  // Gửi ảnh
-            dataOut.flush();  // Đảm bảo gửi ảnh hoàn tất
-        } catch (IOException e) {
-            e.printStackTrace();
-            appendMessage("Lỗi khi gửi ảnh: " + e.getMessage(), true);
+        if (bytesRead != imageBytes.length) {
+            throw new IOException("Lỗi khi đọc file, không đọc đủ dữ liệu.");
         }
+
+        out.println("IMAGE|" + username);
+        dataOut.writeLong(imageBytes.length);
+        dataOut.writeUTF(imageFile.getName());
+        dataOut.write(imageBytes);
+        dataOut.flush();
+        
+        displayImageInChat(imageBytes, true, username);
+    } catch (IOException e) {
+        e.printStackTrace();
+        JOptionPane.showMessageDialog(this, "Lỗi khi gửi ảnh: " + e.getMessage());
+        // Optionally, reset the connection here
+        reconnect();
     }
+}
 
-    private void displayImageInChat(byte[] imageBytes, boolean isSender) {
-        try {
-            ImageIcon imageIcon = new ImageIcon(imageBytes);
-            Image image = imageIcon.getImage();
-            Image resizedImage = image.getScaledInstance(200, 200, Image.SCALE_SMOOTH);
-            imageIcon = new ImageIcon(resizedImage);
+    private void displayImageInChat(byte[] imageData, boolean isSender, String sender) {
+    try {
+        StyledDocument doc = txpboxchat.getStyledDocument();
+        Style style = txpboxchat.addStyle("ImageStyle", null);
+        
+        // Căn lề dựa vào người gửi/nhận
+        SimpleAttributeSet align = new SimpleAttributeSet();
+        StyleConstants.setAlignment(align, isSender ? StyleConstants.ALIGN_RIGHT : StyleConstants.ALIGN_LEFT);
+        doc.setParagraphAttributes(doc.getLength(), 1, align, false);
 
-            StyledDocument doc = txpboxchat.getStyledDocument();
-            Style style = txpboxchat.addStyle("Default", null);
-
-            if (isSender) {
-                StyleConstants.setAlignment(style, StyleConstants.ALIGN_RIGHT);
-            } else {
-                StyleConstants.setAlignment(style, StyleConstants.ALIGN_LEFT);
-            }
-
-            doc.insertString(doc.getLength(), "\n", style);
-            txpboxchat.insertIcon(imageIcon);
-        } catch (Exception e) {
-            e.printStackTrace();
-            appendMessage("Lỗi khi hiển thị ảnh: " + e.getMessage(), false);
-        }
+        // Hiển thị tên người gửi
+        String displayName = isSender ? "Bạn" : sender;
+        StyleConstants.setForeground(style, isSender ? Color.BLUE : Color.BLACK);
+        StyleConstants.setBold(style, true);
+        doc.insertString(doc.getLength(), displayName + ":\n", style);
+        
+        // Reset style cho ảnh
+        style = txpboxchat.addStyle("ImageStyle", null);
+        
+        // Tạo và resize ảnh
+        ImageIcon originalIcon = new ImageIcon(imageData);
+        Image originalImage = originalIcon.getImage();
+        
+        // Tính toán kích thước mới giữ tỷ lệ
+        int maxWidth = 300;
+        int maxHeight = 300;
+        
+        double scale = Math.min(
+            (double) maxWidth / originalImage.getWidth(null),
+            (double) maxHeight / originalImage.getHeight(null)
+        );
+        
+        int newWidth = (int) (originalImage.getWidth(null) * scale);
+        int newHeight = (int) (originalImage.getHeight(null) * scale);
+        
+        Image resizedImage = originalImage.getScaledInstance(newWidth, newHeight, Image.SCALE_SMOOTH);
+        ImageIcon resizedIcon = new ImageIcon(resizedImage);
+        
+        // Chèn ảnh
+        txpboxchat.setCaretPosition(doc.getLength());
+        txpboxchat.insertIcon(resizedIcon);
+        doc.insertString(doc.getLength(), "\n\n", style);
+        
+        // Cuộn xuống cuối
+        txpboxchat.setCaretPosition(doc.getLength());
+    } catch (Exception e) {
+        e.printStackTrace();
+        appendMessage("Lỗi khi hiển thị ảnh: " + e.getMessage(), false);
     }
+}
+    
 
     private void chooseAndSendImage() {
         JFileChooser fileChooser = new JFileChooser();
-        fileChooser.setDialogTitle("Chọn hình ảnh");
-        fileChooser.setFileFilter(new FileNameExtensionFilter("Image files", "jpg", "jpeg", "png", "gif"));
+    fileChooser.setFileFilter(new FileNameExtensionFilter("Image Files", "jpg", "png", "gif"));
+    int result = fileChooser.showOpenDialog(this);
+    if (result == JFileChooser.APPROVE_OPTION) {
+        imageFile = fileChooser.getSelectedFile();
+        // Gọi sendImage khi đã chọn tệp
+        sendImage(imageFile);
+    }
+    }
+    private void sendFile(String filePath) {
+    try {
+        File file = new File(filePath);
+        byte[] fileBytes = Files.readAllBytes(file.toPath());
 
-        int result = fileChooser.showOpenDialog(this);
+        // Gửi tín hiệu tới server
+        out.println("FILE|" + file.getName()); 
+        out.flush();
+
+        // Gửi nội dung file
+        DataOutputStream dataOut = new DataOutputStream(socket.getOutputStream());
+        dataOut.writeInt(fileBytes.length); // Gửi độ dài file
+        dataOut.write(fileBytes); // Gửi nội dung file
+        dataOut.flush();
+
+        appendMessage("Bạn đã gửi file: " + file.getName(), true);
+    } catch (IOException e) {
+        appendMessage("Lỗi khi gửi file: " + e.getMessage(), true);
+    }
+}
+    private void saveReceivedFile(String fileName, byte[] fileData) {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Chọn nơi lưu file");
+        fileChooser.setSelectedFile(new File(fileName));
+        int result = fileChooser.showSaveDialog(this);
         if (result == JFileChooser.APPROVE_OPTION) {
-            File selectedFile = fileChooser.getSelectedFile();
-            String filePath = selectedFile.getAbsolutePath();
-            sendImage(filePath);
-
-            try {
-                byte[] imageBytes = Files.readAllBytes(selectedFile.toPath());
-                displayImageInChat(imageBytes, true);  // Hiển thị ảnh đã gửi
+            File file = fileChooser.getSelectedFile();
+            try (FileOutputStream fos = new FileOutputStream(file)) {
+                fos.write(fileData);
+                appendMessage("File đã được lưu tại: " + file.getAbsolutePath(), false);
             } catch (IOException e) {
-                e.printStackTrace();
+                appendMessage("Lỗi khi lưu file: " + e.getMessage(), false);
             }
         }
     }
+    private void receiveFile() {
+    try {
+            // Đọc kích thước file
+            long fileSize = dataIn.readLong();
+            // Đọc tên file
+            String fileName = dataIn.readUTF();
+            
+            // Đọc dữ liệu file
+            byte[] fileData = new byte[(int) fileSize];
+            int bytesRead = 0;
+            while (bytesRead < fileSize) {
+                int result = dataIn.read(fileData, bytesRead, (int) fileSize - bytesRead);
+                if (result == -1) break;
+                bytesRead += result;
+            }
+
+            // Lưu file
+            saveReceivedFile(fileName, fileData);
+        } catch (IOException e) {
+            appendMessage("Lỗi khi nhận file: " + e.getMessage(), false);
+        }
+}
+    private void reconnect() {
+    try {
+        if (socket != null && !socket.isClosed()) {
+            socket.close();
+        }
+        connectToServer();
+    } catch (IOException e) {
+        appendMessage("Không thể kết nối lại với server: " + e.getMessage(), false);
+    }
+}
 
     /**
      * This method is called from within the constructor to initialize the form.
@@ -375,7 +523,7 @@ receiveThread.start();
         int result = fileChooser.showOpenDialog(this);
         if (result == JFileChooser.APPROVE_OPTION) {
             File selectedFile = fileChooser.getSelectedFile();
-            appendMessage("Đã chọn file: " + selectedFile.getName(), true);
+            sendFile(selectedFile.getAbsolutePath());
         }
     }//GEN-LAST:event_btnfileActionPerformed
 
@@ -387,36 +535,36 @@ receiveThread.start();
      * @param args the command line arguments
      */
     public static void main(String args[]) {
-        /* Set the Nimbus look and feel */
-        //<editor-fold defaultstate="collapsed" desc=" Look and feel setting code (optional) ">
-        /* If Nimbus (introduced in Java SE 6) is not available, stay with the default look and feel.
+    /* Set the Nimbus look and feel */
+    //<editor-fold defaultstate="collapsed" desc=" Look and feel setting code (optional) ">
+    /* If Nimbus (introduced in Java SE 6) is not available, stay with the default look and feel.
          * For details see http://download.oracle.com/javase/tutorial/uiswing/lookandfeel/plaf.html 
-         */
-        try {
-            for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
-                if ("Nimbus".equals(info.getName())) {
-                    javax.swing.UIManager.setLookAndFeel(info.getClassName());
-                    break;
-                }
+     */
+    try {
+        for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
+            if ("Nimbus".equals(info.getName())) {
+                javax.swing.UIManager.setLookAndFeel(info.getClassName());
+                break;
             }
-        } catch (ClassNotFoundException ex) {
-            java.util.logging.Logger.getLogger(frmChatApp.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (InstantiationException ex) {
-            java.util.logging.Logger.getLogger(frmChatApp.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (IllegalAccessException ex) {
-            java.util.logging.Logger.getLogger(frmChatApp.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (javax.swing.UnsupportedLookAndFeelException ex) {
-            java.util.logging.Logger.getLogger(frmChatApp.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
         }
-        //</editor-fold>
-
-        /* Create and display the form */
-        java.awt.EventQueue.invokeLater(new Runnable() {
-            public void run() {
-                new frmChatApp().setVisible(true);
-            }
-        });
+    } catch (ClassNotFoundException ex) {
+        java.util.logging.Logger.getLogger(frmChatApp.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+    } catch (InstantiationException ex) {
+        java.util.logging.Logger.getLogger(frmChatApp.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+    } catch (IllegalAccessException ex) {
+        java.util.logging.Logger.getLogger(frmChatApp.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+    } catch (javax.swing.UnsupportedLookAndFeelException ex) {
+        java.util.logging.Logger.getLogger(frmChatApp.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
     }
+    //</editor-fold>
+
+    /* Create and display the form */
+    java.awt.EventQueue.invokeLater(new Runnable() {
+        public void run() {
+            new frmChatApp().setVisible(true);
+        }
+    });
+}
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton btndownload;

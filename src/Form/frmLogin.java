@@ -39,7 +39,7 @@ public class frmLogin extends javax.swing.JFrame {
         jLabel2 = new javax.swing.JLabel();
         txtloginname = new javax.swing.JTextField();
         jLabel3 = new javax.swing.JLabel();
-        btnlogin1 = new javax.swing.JButton();
+        btnregister = new javax.swing.JButton();
         jLabel4 = new javax.swing.JLabel();
 
         jLabel5.setText("jLabel5");
@@ -81,13 +81,13 @@ public class frmLogin extends javax.swing.JFrame {
         jLabel3.setFont(new java.awt.Font("Segoe UI", 0, 14)); // NOI18N
         jLabel3.setText("Nếu bạn chưa có tài khoản ?");
 
-        btnlogin1.setBackground(new java.awt.Color(0, 51, 204));
-        btnlogin1.setFont(new java.awt.Font("Segoe UI", 1, 18)); // NOI18N
-        btnlogin1.setForeground(new java.awt.Color(255, 255, 255));
-        btnlogin1.setText("Đăng kí");
-        btnlogin1.addActionListener(new java.awt.event.ActionListener() {
+        btnregister.setBackground(new java.awt.Color(0, 51, 204));
+        btnregister.setFont(new java.awt.Font("Segoe UI", 1, 18)); // NOI18N
+        btnregister.setForeground(new java.awt.Color(255, 255, 255));
+        btnregister.setText("Đăng kí");
+        btnregister.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                btnlogin1ActionPerformed(evt);
+                btnregisterActionPerformed(evt);
             }
         });
 
@@ -102,7 +102,7 @@ public class frmLogin extends javax.swing.JFrame {
                 .addGap(45, 45, 45)
                 .addComponent(jLabel3)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addComponent(btnlogin1)
+                .addComponent(btnregister)
                 .addGap(0, 29, Short.MAX_VALUE))
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel2Layout.createSequentialGroup()
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
@@ -137,7 +137,7 @@ public class frmLogin extends javax.swing.JFrame {
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addGroup(jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(jLabel3)
-                    .addComponent(btnlogin1))
+                    .addComponent(btnregister))
                 .addGap(54, 54, 54))
         );
 
@@ -192,9 +192,11 @@ public class frmLogin extends javax.swing.JFrame {
 
     }//GEN-LAST:event_btnloginActionPerformed
 
-    private void btnlogin1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnlogin1ActionPerformed
-        // TODO add your handling code here:
-    }//GEN-LAST:event_btnlogin1ActionPerformed
+    private void btnregisterActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnregisterActionPerformed
+        frmRegister register = new frmRegister();
+        this.dispose();
+        register.setVisible(true);
+    }//GEN-LAST:event_btnregisterActionPerformed
 
     /**
      * @param args the command line arguments
@@ -233,7 +235,7 @@ public class frmLogin extends javax.swing.JFrame {
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton btnlogin;
-    private javax.swing.JButton btnlogin1;
+    private javax.swing.JButton btnregister;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;

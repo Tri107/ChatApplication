@@ -3,15 +3,18 @@
  * Click nbfs://nbhost/SystemFileSystem/Templates/GUIForms/JFrame.java to edit this template
  */
 package Form;
+
 import java.io.*;
 import java.net.*;
 import java.util.*;
+
 /**
  *
  * @author DELL
  */
 public class frmServer extends javax.swing.JFrame {
-     private ServerSocket serverSocket;
+
+    private ServerSocket serverSocket;
     private final List<ClientHandler> clients = Collections.synchronizedList(new ArrayList<>());
 
     /**
@@ -21,9 +24,10 @@ public class frmServer extends javax.swing.JFrame {
         initComponents();
         btnkhoidong.addActionListener(evt -> startServer());
     }
+
     private void startServer() {
         try {
-            serverSocket = new ServerSocket(8386); 
+            serverSocket = new ServerSocket(8386);
             txaserver.append("Server đã khởi động tại cổng 8386\n");
 
             Thread acceptThread = new Thread(() -> {
@@ -47,80 +51,176 @@ public class frmServer extends javax.swing.JFrame {
     }
 
     private class ClientHandler implements Runnable {
+
         private final Socket clientSocket;
         private PrintWriter out;
         private BufferedReader in;
-        private InputStream clientInputStream;
+        private DataInputStream dataIn;
+        private DataOutputStream dataOut;
 
         public ClientHandler(Socket socket) {
             this.clientSocket = socket;
+            try {
+                out = new PrintWriter(clientSocket.getOutputStream(), true);
+                in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+                dataIn = new DataInputStream(clientSocket.getInputStream());
+                dataOut = new DataOutputStream(clientSocket.getOutputStream());
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
 
         @Override
         public void run() {
             try {
-            in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-            out = new PrintWriter(clientSocket.getOutputStream(), true);
-            clientInputStream = clientSocket.getInputStream();
-
-            String message;
-            while ((message = in.readLine()) != null) {
-                if (message.startsWith("IMAGE|")) {
-                    // Xử lý ảnh
-                    String imageName = message.substring(6);  // Lấy tên file ảnh
-                    DataInputStream dataIn = new DataInputStream(clientInputStream);
-                    int imageLength = dataIn.readInt();  // Lấy kích thước ảnh
-                    byte[] imageBytes = new byte[imageLength];
-                    dataIn.readFully(imageBytes);  // Đọc toàn bộ ảnh từ client
-
-                    broadcastImage(imageName, imageBytes);  // Gửi ảnh tới tất cả client
-                } else {
-                    // Gửi tin nhắn văn bản
-                    broadcastMessage(message);
+                String message;
+                while ((message = in.readLine()) != null) {
+                    if (message.startsWith("IMAGE|")) {
+                        handleImageTransfer();
+                    } else if (message.startsWith("FILE|")) {
+                        handleFileTransfer();
+                    } else {
+                        broadcastMessage(message);
+                    }
                 }
+            } catch (IOException e) {
+                txaserver.append("Lỗi với client: " + e.getMessage() + "\n");
+            } finally {
+                closeConnection();
+            }
+        }
+
+        private void handleImageTransfer() throws IOException {
+          try {
+        // Read image size
+        long imageSize = dataIn.readLong();
+        txaserver.append("Receiving image of size: " + imageSize + "\n");
+        
+        // Read image name
+        String imageName = dataIn.readUTF();
+        txaserver.append("Image name: " + imageName + "\n");
+
+        // Read image data
+        byte[] imageData = new byte[(int) imageSize];
+        int bytesRead = 0;
+        while (bytesRead < imageSize) {
+            int result = dataIn.read(imageData, bytesRead, (int) imageSize - bytesRead);
+            if (result == -1) {
+                throw new IOException("End of stream reached while reading image.");
+            }
+            bytesRead += result;
+        }
+
+        txaserver.append("Successfully received image: " + imageName + "\n");
+        
+        // Broadcast image
+        broadcastImage(imageName, imageData);
+    } catch (IOException e) {
+        txaserver.append("Error during image handling: " + e.getMessage() + "\n");
+        throw e;  // Propagate the exception
+    }
+        }
+
+        private void handleFileTransfer() throws IOException {
+            // Đọc kích thước file
+            long fileSize = dataIn.readLong();
+            // Đọc tên file
+            String fileName = dataIn.readUTF();
+
+            // Đọc dữ liệu file
+            byte[] fileData = new byte[(int) fileSize];
+            int bytesRead = 0;
+            while (bytesRead < fileSize) {
+                int result = dataIn.read(fileData, bytesRead, (int) fileSize - bytesRead);
+                if (result == -1) {
+                    break;
+                }
+                bytesRead += result;
             }
 
-        } catch (IOException e) {
-            txaserver.append("Lỗi với client: " + e.getMessage() + "\n");
-        } finally {
-            try {
-                clientSocket.close();
-            } catch (IOException e) {
-                txaserver.append("Lỗi khi đóng kết nối client: " + e.getMessage() + "\n");
-            }
-            clients.remove(this);
-        }
+            // Broadcast file
+            broadcastFile(fileName, fileData);
         }
 
         private void broadcastMessage(String message) {
             synchronized (clients) {
-            for (ClientHandler client : clients) {
-                if (client != this) {
-                    client.out.println(message);
+                for (ClientHandler client : clients) {
+                    if (client != this) {
+                        client.out.println(message);
+                    }
                 }
+
             }
-        
         }
-    }
-        private void broadcastImage(String imageName, byte[] imageBytes) {
-         synchronized (clients) {
-            for (ClientHandler client : clients) {
-                if (client != this) {
-                    // Gửi tên ảnh và nội dung ảnh cho client
-                    client.out.println("IMAGE|"+imageName);
-                    DataOutputStream dataOut;
-                    try {
-                        dataOut = new DataOutputStream(client.clientSocket.getOutputStream());
-                        dataOut.writeInt(imageBytes.length);  // Gửi kích thước ảnh
-                        dataOut.write(imageBytes);  // Gửi ảnh cho client
-                        dataOut.flush();
-                    } catch (IOException e) {
-                        e.printStackTrace();
+
+        private void broadcastImage(String imageName, byte[] imageData) {
+            synchronized (clients) {
+                for (ClientHandler client : clients) {
+                    if (client != this) {
+                        try {
+                            // Gửi marker và kích thước
+                            client.out.println("IMAGE|");
+                            client.dataOut.writeLong(imageData.length);
+
+                            // Gửi tên ảnh
+                            client.dataOut.writeUTF(imageName);
+
+                            // Gửi dữ liệu ảnh
+                            client.dataOut.write(imageData);
+                            client.dataOut.flush();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
                     }
                 }
             }
         }
-    }
+
+        private void broadcastFile(String fileName, byte[] fileData) {
+            synchronized (clients) {
+                for (ClientHandler client : clients) {
+                    if (client != this) {
+                        try {
+                            // Gửi marker và kích thước
+                            client.out.println("FILE|");
+                            client.dataOut.writeLong(fileData.length);
+
+                            // Gửi tên file
+                            client.dataOut.writeUTF(fileName);
+
+                            // Gửi dữ liệu file
+                            client.dataOut.write(fileData);
+                            client.dataOut.flush();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            }
+        }
+
+        private void closeConnection() {
+            try {
+                if (out != null) {
+                    out.close();
+                }
+                if (in != null) {
+                    in.close();
+                }
+                if (dataIn != null) {
+                    dataIn.close();
+                }
+                if (dataOut != null) {
+                    dataOut.close();
+                }
+                if (clientSocket != null) {
+                    clientSocket.close();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            clients.remove(this);
+        }
     }
 
     /**

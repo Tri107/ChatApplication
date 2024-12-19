@@ -278,7 +278,9 @@ public class frmRegister extends javax.swing.JFrame {
     }//GEN-LAST:event_btndangkiActionPerformed
 
     private void btnloginActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnloginActionPerformed
-        // TODO add your handling code here:
+        frmLogin login = new frmLogin();
+        this.dispose();
+        login.setVisible(true);
     }//GEN-LAST:event_btnloginActionPerformed
 
     /**

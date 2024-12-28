@@ -83,6 +83,9 @@ public class frmServer extends javax.swing.JFrame {
                         handleImageTransfer();
                     } else if (message.startsWith("FILE|")) {
                         handleFileTransfer();
+                    } else if (message.startsWith("DOWNLOAD|")) {
+                        String fileName = message.substring("DOWNLOAD|".length());
+                        handleDownloadRequest(fileName.trim());
                     } else {
                         broadcastMessage(message);
                     }
@@ -110,18 +113,39 @@ public class frmServer extends javax.swing.JFrame {
         }
 
         private void handleFileTransfer() throws IOException {
-            // Đọc kích thước file (long)
+            // Đọc kích thước file từ luồng
             long fileSize = readLongFromBufferedStream();
-            int nameLength = readIntFromBufferedStream(); // Vẫn cần đọc để xác định tên file chính xác
+            int nameLength = readIntFromBufferedStream();
+
+            // Đọc tên file
             byte[] nameBytes = new byte[nameLength];
             readFully(bufferedIn, nameBytes);
             String fileName = new String(nameBytes, StandardCharsets.UTF_8);
+
+            // Đọc dữ liệu file
             byte[] fileData = new byte[(int) fileSize];
             readFully(bufferedIn, fileData);
-            txaserver.append("Received file: " + fileName + " (Size: " + fileSize + " bytes)\n");
-            File outputFile = new File("server_files/" + fileName);
-            Files.write(outputFile.toPath(), fileData);
-            broadcastFile(fileName);
+
+            // Tạo thư mục server_files nếu chưa tồn tại
+            File outputDir = new File("server_files");
+            if (!outputDir.exists()) {
+                if (outputDir.mkdir()) {
+                    txaserver.append("Thư mục server_files đã được tạo.\n");
+                } else {
+                    txaserver.append("Không thể tạo thư mục server_files.\n");
+                    return; // Dừng việc lưu file nếu không thể tạo thư mục
+                }
+            }
+
+            // Tạo file đầu ra trong thư mục server_files
+            File outputFile = new File(outputDir, fileName);
+            try (FileOutputStream fileOut = new FileOutputStream(outputFile)) {
+                fileOut.write(fileData);
+                txaserver.append("File đã được lưu: " + outputFile.getAbsolutePath() + "\n");
+            } catch (IOException e) {
+                txaserver.append("Lỗi khi lưu file: " + e.getMessage() + "\n");
+                e.printStackTrace();
+            }
         }
 
         private long readLongFromBufferedStream() throws IOException {
@@ -150,6 +174,28 @@ public class frmServer extends javax.swing.JFrame {
             if (offset < buffer.length) {
                 throw new EOFException("Premature EOF encountered while reading data");
             }
+        }
+
+        private void handleDownloadRequest(String fileName) throws IOException {
+            File requestedFile = new File("server_files", fileName);
+            if (requestedFile.exists() && requestedFile.isFile()) {
+                txaserver.append("File " + fileName + " tồn tại. Đang gửi file về client.\n");
+                sendFileToClient(requestedFile);
+            } else {
+                txaserver.append("File " + fileName + " không tồn tại trong thư mục server_files.\n");
+                out.println("DOWNLOAD_FAILED|File không tồn tại");
+            }
+        }
+
+        private void sendFileToClient(File file) throws IOException {
+            byte[] fileData = Files.readAllBytes(file.toPath());
+            dataOut.writeLong(fileData.length);
+            byte[] nameBytes = file.getName().getBytes(StandardCharsets.UTF_8);
+            dataOut.writeInt(nameBytes.length);
+            dataOut.write(nameBytes);
+            dataOut.write(fileData);
+            dataOut.flush();
+            txaserver.append("File đã được gửi thành công: " + file.getName() + "\n");
         }
 
         private void broadcastMessage(String message) {
@@ -226,6 +272,17 @@ public class frmServer extends javax.swing.JFrame {
         }
     }
 
+    private void stopServer() {
+        try {
+            if (serverSocket != null && !serverSocket.isClosed()) {
+                serverSocket.close();
+            }
+            txaserver.append("Server đã dừng.\n");
+        } catch (IOException e) {
+            txaserver.append("Lỗi khi dừng server: " + e.getMessage() + "\n");
+        }
+    }
+
     /**
      * This method is called from within the constructor to initialize the form.
      * WARNING: Do NOT modify this code. The content of this method is always
@@ -238,6 +295,7 @@ public class frmServer extends javax.swing.JFrame {
         jScrollPane1 = new javax.swing.JScrollPane();
         txaserver = new javax.swing.JTextArea();
         btnkhoidong = new javax.swing.JButton();
+        btnstop = new javax.swing.JButton();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
 
@@ -245,7 +303,14 @@ public class frmServer extends javax.swing.JFrame {
         txaserver.setRows(5);
         jScrollPane1.setViewportView(txaserver);
 
-        btnkhoidong.setText("jButton1");
+        btnkhoidong.setText("Start");
+
+        btnstop.setText("Stop");
+        btnstop.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnstopActionPerformed(evt);
+            }
+        });
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
@@ -255,21 +320,30 @@ public class frmServer extends javax.swing.JFrame {
                 .addGap(44, 44, 44)
                 .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 350, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(43, 43, 43)
-                .addComponent(btnkhoidong)
-                .addContainerGap(57, Short.MAX_VALUE))
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(btnkhoidong)
+                    .addComponent(btnstop))
+                .addContainerGap(60, Short.MAX_VALUE))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
                 .addGap(45, 45, 45)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(btnkhoidong)
+                    .addGroup(layout.createSequentialGroup()
+                        .addComponent(btnkhoidong)
+                        .addGap(37, 37, 37)
+                        .addComponent(btnstop))
                     .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 223, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addContainerGap(163, Short.MAX_VALUE))
         );
 
         pack();
     }// </editor-fold>//GEN-END:initComponents
+
+    private void btnstopActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnstopActionPerformed
+        stopServer();
+    }//GEN-LAST:event_btnstopActionPerformed
 
     /**
      * @param args the command line arguments
@@ -308,6 +382,7 @@ public class frmServer extends javax.swing.JFrame {
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton btnkhoidong;
+    private javax.swing.JButton btnstop;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JTextArea txaserver;
     // End of variables declaration//GEN-END:variables

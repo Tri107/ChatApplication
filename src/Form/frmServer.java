@@ -84,8 +84,8 @@ public class frmServer extends javax.swing.JFrame {
                     } else if (message.startsWith("FILE|")) {
                         handleFileTransfer();
                     } else if (message.startsWith("DOWNLOAD|")) {
-                        String fileName = message.substring("DOWNLOAD|".length());
-                        handleDownloadRequest(fileName.trim());
+                        String fileName = message.substring(9); // Cắt bỏ "DOWNLOAD|"
+                        handleDownloadRequest(fileName, dataOut); // Gọi phương thức tải file
                     } else {
                         broadcastMessage(message);
                     }
@@ -113,35 +113,35 @@ public class frmServer extends javax.swing.JFrame {
         }
 
         private void handleFileTransfer() throws IOException {
-            // Đọc kích thước file từ luồng
-            long fileSize = readLongFromBufferedStream();
-            int nameLength = readIntFromBufferedStream();
+            txaserver.append("Bắt đầu nhận file...\n");
 
-            // Đọc tên file
+            // Đọc kích thước file
+            long fileSize = readLongFromBufferedStream();
+            txaserver.append("Kích thước file: " + fileSize + " bytes\n");
+
+            // Đọc độ dài và tên file
+            int nameLength = readIntFromBufferedStream();
             byte[] nameBytes = new byte[nameLength];
             readFully(bufferedIn, nameBytes);
             String fileName = new String(nameBytes, StandardCharsets.UTF_8);
+            txaserver.append("Tên file: " + fileName + "\n");
 
-            // Đọc dữ liệu file
+            // Đọc nội dung file
             byte[] fileData = new byte[(int) fileSize];
             readFully(bufferedIn, fileData);
+            txaserver.append("Dữ liệu file đã được nhận đủ.\n");
 
-            // Tạo thư mục server_files nếu chưa tồn tại
-            File outputDir = new File("server_files");
-            if (!outputDir.exists()) {
-                if (outputDir.mkdir()) {
-                    txaserver.append("Thư mục server_files đã được tạo.\n");
-                } else {
-                    txaserver.append("Không thể tạo thư mục server_files.\n");
-                    return; // Dừng việc lưu file nếu không thể tạo thư mục
-                }
+            // Lưu file
+            String serverFilesPath = "D:\\server_files";
+            File outputDir = new File(serverFilesPath);
+            if (!outputDir.exists() && !outputDir.mkdirs()) {
+                txaserver.append("Không thể tạo thư mục: " + serverFilesPath + "\n");
+                return;
             }
-
-            // Tạo file đầu ra trong thư mục server_files
             File outputFile = new File(outputDir, fileName);
             try (FileOutputStream fileOut = new FileOutputStream(outputFile)) {
                 fileOut.write(fileData);
-                txaserver.append("File đã được lưu: " + outputFile.getAbsolutePath() + "\n");
+                txaserver.append("File đã được lưu tại: " + outputFile.getAbsolutePath() + "\n");
             } catch (IOException e) {
                 txaserver.append("Lỗi khi lưu file: " + e.getMessage() + "\n");
                 e.printStackTrace();
@@ -172,18 +172,34 @@ public class frmServer extends javax.swing.JFrame {
                 offset += bytesRead;
             }
             if (offset < buffer.length) {
-                throw new EOFException("Premature EOF encountered while reading data");
+                throw new EOFException("Không đọc đủ dữ liệu từ stream.");
             }
         }
 
-        private void handleDownloadRequest(String fileName) throws IOException {
-            File requestedFile = new File("server_files", fileName);
-            if (requestedFile.exists() && requestedFile.isFile()) {
-                txaserver.append("File " + fileName + " tồn tại. Đang gửi file về client.\n");
-                sendFileToClient(requestedFile);
-            } else {
-                txaserver.append("File " + fileName + " không tồn tại trong thư mục server_files.\n");
-                out.println("DOWNLOAD_FAILED|File không tồn tại");
+        private void handleDownloadRequest(String fileName, DataOutputStream out) {
+            try {
+                // Đảm bảo thư mục "server_files" tồn tại
+                File file = new File("server_files", fileName);
+
+                if (file.exists() && file.isFile()) {
+                    // Gửi thông tin file về cho client
+                    out.writeUTF("FILE|" + fileName); // Gửi tên file
+
+                    // Gửi kích thước file
+                    out.writeLong(file.length());
+
+                    // Gửi dữ liệu file
+                    sendFileToClient(file); // Gọi hàm sendFileToClient để gửi file
+
+                    txaserver.append("File " + fileName + " đã được gửi cho client.\n");
+                } else {
+                    // Nếu không tìm thấy file
+                    out.writeUTF("ERROR|File không tồn tại.");
+                    txaserver.append("File " + fileName + " không tồn tại trên server.\n");
+                }
+            } catch (IOException e) {
+                txaserver.append("Lỗi khi gửi file: " + e.getMessage() + "\n");
+                e.printStackTrace();
             }
         }
 

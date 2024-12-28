@@ -332,20 +332,28 @@ public class frmChatApp extends javax.swing.JFrame {
         sendImage(imageFile);
     }
     }
-    private void sendFile(String filePath) {
+   private void sendFile(String filePath) {
     try {
         File file = new File(filePath);
         if (!file.exists() || !file.isFile()) {
             appendMessage("File không tồn tại hoặc không hợp lệ.", true);
             return;
         }
+        if (file.length() == 0) {
+            JOptionPane.showMessageDialog(this, "File không hợp lệ.");
+            return;
+        }
 
+        // Đọc dữ liệu file
         byte[] fileBytes = Files.readAllBytes(file.toPath());
         BufferedOutputStream bos = new BufferedOutputStream(socket.getOutputStream());
-        
-        // Gửi tên file
-        bos.write(file.getName().getBytes(StandardCharsets.UTF_8));
-        
+
+        // Gửi tên file (kèm ký tự xuống dòng để phân tách)
+        bos.write((file.getName() + "\n").getBytes(StandardCharsets.UTF_8));
+
+        // Gửi kích thước file
+        bos.write((file.length() + "\n").getBytes(StandardCharsets.UTF_8));
+
         // Gửi dữ liệu file
         bos.write(fileBytes);
         bos.flush();
@@ -383,44 +391,51 @@ public class frmChatApp extends javax.swing.JFrame {
         SimpleAttributeSet align = new SimpleAttributeSet();
         StyleConstants.setAlignment(align, isSender ? StyleConstants.ALIGN_RIGHT : StyleConstants.ALIGN_LEFT);
         doc.setParagraphAttributes(doc.getLength(), 1, align, false);
-        
+
         String displayName = isSender ? "Bạn" : sender;
         StyleConstants.setForeground(style, isSender ? Color.BLUE : Color.BLACK);
         StyleConstants.setBold(style, true);
         doc.insertString(doc.getLength(), displayName + ":\n", style);
-        
+
+        // Chuyển đổi kích thước file sang dạng KB hoặc MB
+        String readableSize = convertFileSize(fileData.length);
+
         // Hiển thị tên file và kích thước
-        String fileDisplayText = "File: " + fileName + " (Size: " + fileData.length + " bytes)\n";
-        
+        String fileDisplayText = "File: " + fileName + " (Size: " + readableSize + ")\n";
+
         // Chèn tên file vào chat
         StyleConstants.setForeground(style, Color.BLACK); // Màu chữ bình thường
         doc.insertString(doc.getLength(), fileDisplayText, style);
-        
+
         // Tạo một liên kết mở file (nếu cần thiết, lưu file trên hệ thống)
-        // Bạn có thể sử dụng Java's Desktop API để mở file nếu file đã được lưu xuống máy tính người dùng
-        
-        // Ví dụ tạo liên kết (có thể mở file, bạn sẽ cần lưu file trước khi mở)
-        String filePath = "C:\\Users\\DELL\\OneDrive\\Pictures\\Project Chat" + fileName;
+        String filePath = "C:\\Users\\DELL\\OneDrive\\Pictures\\Project Chat\\" + fileName;
         doc.insertString(doc.getLength(), " [Mở file]", style);
-        doc.setCharacterAttributes(doc.getLength() - 9, 9, getLinkStyle(filePath), false);  // Style for link
-        
+        doc.setCharacterAttributes(doc.getLength() - 9, 9, getLinkStyle(filePath), false); // Style cho liên kết
+
         doc.insertString(doc.getLength(), "\n\n", style);
-        
+
         // Cuộn xuống cuối
         txpboxchat.setCaretPosition(doc.getLength());
-        
     } catch (Exception e) {
         e.printStackTrace();
         appendMessage("Lỗi khi hiển thị file: " + e.getMessage(), false);
     }
 }
-   private Style getLinkStyle(String filePath) {
+   private String convertFileSize(long sizeInBytes) {
+    if (sizeInBytes < 1024) {
+        return sizeInBytes + " B"; // Byte
+    } else if (sizeInBytes < 1024 * 1024) {
+        return String.format("%.2f KB", sizeInBytes / 1024.0); // KB
+    } else {
+        return String.format("%.2f MB", sizeInBytes / (1024.0 * 1024.0)); // MB
+    }
+}
+
+private Style getLinkStyle(String filePath) {
     Style style = txpboxchat.addStyle("LinkStyle", null);
     StyleConstants.setForeground(style, Color.BLUE);
     StyleConstants.setUnderline(style, true);
-    // Đây là một ví dụ về việc mở file khi người dùng click vào liên kết
-    // Nếu bạn muốn xử lý sự kiện click để mở file, bạn có thể sử dụng một HyperlinkListener hoặc MouseListener
-    // Điều này có thể đươc thêm vào trong ứng dụng của bạn khi cần thiết
+    // Nếu bạn muốn xử lý sự kiện click để mở file, thêm MouseListener vào đây
     return style;
 }
     private void reconnect() {

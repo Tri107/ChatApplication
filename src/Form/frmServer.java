@@ -9,6 +9,7 @@ import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.*;
 
 /**
@@ -55,177 +56,175 @@ public class frmServer extends javax.swing.JFrame {
 
     private class ClientHandler implements Runnable {
 
-    private final Socket clientSocket;
-    private PrintWriter out;
-    private BufferedReader in;
-    private BufferedInputStream bufferedIn;
-    private DataOutputStream dataOut;
+        private final Socket clientSocket;
+        private PrintWriter out;
+        private BufferedReader in;
+        private BufferedInputStream bufferedIn;
+        private DataOutputStream dataOut;
 
-    public ClientHandler(Socket socket) {
-        this.clientSocket = socket;
-        try {
-            out = new PrintWriter(clientSocket.getOutputStream(), true);
-            in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-            bufferedIn = new BufferedInputStream(clientSocket.getInputStream());  // BufferedInputStream thay cho DataInputStream
-            dataOut = new DataOutputStream(clientSocket.getOutputStream());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    @Override
-    public void run() {
-        try {
-            String message;
-            while ((message = in.readLine()) != null) {
-                if (message.startsWith("IMAGE|")) {
-                    handleImageTransfer();
-                } else if (message.startsWith("FILE|")) {
-                    handleFileTransfer();
-                } else {
-                    broadcastMessage(message);
-                }
-            }
-        } catch (IOException e) {
-            txaserver.append("Lỗi với client: " + e.getMessage() + "\n");
-        } finally {
-            closeConnection();
-        }
-    }
-
-    private void handleImageTransfer() throws IOException {
-
-        long imageSize = readLongFromBufferedStream();
-        txaserver.append("Receiving image of size: " + imageSize + "\n");
-        int nameLength = readIntFromBufferedStream();
-        byte[] nameBytes = new byte[nameLength];
-        readFully(bufferedIn, nameBytes);
-        String imageName = new String(nameBytes, StandardCharsets.UTF_8);
-        txaserver.append("Image name: " + imageName + "\n");
-        byte[] imageData = new byte[(int) imageSize];
-        readFully(bufferedIn, imageData);
-        txaserver.append("Successfully received image: " + imageName + "\n");
-        broadcastImage(imageName, imageData);
-    }
-
-    private void handleFileTransfer() throws IOException {
-        long fileSize = readLongFromBufferedStream();
-        txaserver.append("Receiving file of size: " + fileSize + "\n");
-        int nameLength = readIntFromBufferedStream();
-        byte[] nameBytes = new byte[nameLength];
-        readFully(bufferedIn, nameBytes);
-        String fileName = new String(nameBytes, StandardCharsets.UTF_8);
-        //byte[] fileData = new byte[(int) fileSize];
-        //readFully(bufferedIn, fileData);
-        txaserver.append("Received file: " + fileName + " (Size: " + fileSize + " bytes)\n");
-        broadcastFile(fileName);
-    }
-
-    private long readLongFromBufferedStream() throws IOException {
-        byte[] longBytes = new byte[8];  // Long có kích thước 8 byte
-        readFully(bufferedIn, longBytes);
-         return ByteBuffer.wrap(longBytes)
-                     .order(ByteOrder.BIG_ENDIAN)  // Đảm bảo sử dụng BIG_ENDIAN
-                     .getLong(); 
-    }
-
-    private int readIntFromBufferedStream() throws IOException {
-        byte[] intBytes = new byte[4];  // Int có kích thước 4 byte
-        readFully(bufferedIn, intBytes);
-        return ((int) (intBytes[0] & 0xFF) << 24)
-             | ((int) (intBytes[1] & 0xFF) << 16)
-             | ((int) (intBytes[2] & 0xFF) << 8)
-             | ((int) (intBytes[3] & 0xFF));
-    }
-
-    private void readFully(BufferedInputStream in, byte[] buffer) throws IOException {
-        int offset = 0;
-    int bytesRead;
-    while (offset < buffer.length && (bytesRead = in.read(buffer, offset, buffer.length - offset)) != -1) {
-        offset += bytesRead;
-    }
-    if (offset < buffer.length) {
-        throw new EOFException("Premature EOF encountered while reading data");
-    }
-    }
-
-    private void broadcastMessage(String message) {
-        synchronized (clients) {
-            for (ClientHandler client : clients) {
-                if (client != this) {
-                    client.out.println(message);
-                }
+        public ClientHandler(Socket socket) {
+            this.clientSocket = socket;
+            try {
+                out = new PrintWriter(clientSocket.getOutputStream(), true);
+                in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+                bufferedIn = new BufferedInputStream(clientSocket.getInputStream());  // BufferedInputStream thay cho DataInputStream
+                dataOut = new DataOutputStream(clientSocket.getOutputStream());
+            } catch (IOException e) {
+                e.printStackTrace();
             }
         }
-    }
 
-    private void broadcastImage(String imageName, byte[] imageData) {
-        synchronized (clients) {
-            for (ClientHandler client : clients) {
-                if (client != this) {
-                    try {
-                        client.out.println("IMAGE|");
-                        client.dataOut.writeLong(imageData.length);
-                        byte[] nameBytes = imageName.getBytes("UTF-8");
-                        client.dataOut.writeInt(nameBytes.length);
-                        client.dataOut.write(nameBytes);
-                        client.dataOut.write(imageData);
-                        client.dataOut.flush();
-                    } catch (IOException e) {
-                        e.printStackTrace();
+        @Override
+        public void run() {
+            try {
+                String message;
+                while ((message = in.readLine()) != null) {
+                    if (message.startsWith("IMAGE|")) {
+                        handleImageTransfer();
+                    } else if (message.startsWith("FILE|")) {
+                        handleFileTransfer();
+                    } else {
+                        broadcastMessage(message);
+                    }
+                }
+            } catch (IOException e) {
+                txaserver.append("Lỗi với client: " + e.getMessage() + "\n");
+            } finally {
+                closeConnection();
+            }
+        }
+
+        private void handleImageTransfer() throws IOException {
+
+            long imageSize = readLongFromBufferedStream();
+            txaserver.append("Receiving image of size: " + imageSize + "\n");
+            int nameLength = readIntFromBufferedStream();
+            byte[] nameBytes = new byte[nameLength];
+            readFully(bufferedIn, nameBytes);
+            String imageName = new String(nameBytes, StandardCharsets.UTF_8);
+            txaserver.append("Image name: " + imageName + "\n");
+            byte[] imageData = new byte[(int) imageSize];
+            readFully(bufferedIn, imageData);
+            txaserver.append("Successfully received image: " + imageName + "\n");
+            broadcastImage(imageName, imageData);
+        }
+
+        private void handleFileTransfer() throws IOException {
+            // Đọc kích thước file (long)
+            long fileSize = readLongFromBufferedStream();
+            int nameLength = readIntFromBufferedStream(); // Vẫn cần đọc để xác định tên file chính xác
+            byte[] nameBytes = new byte[nameLength];
+            readFully(bufferedIn, nameBytes);
+            String fileName = new String(nameBytes, StandardCharsets.UTF_8);
+            byte[] fileData = new byte[(int) fileSize];
+            readFully(bufferedIn, fileData);
+            txaserver.append("Received file: " + fileName + " (Size: " + fileSize + " bytes)\n");
+            File outputFile = new File("server_files/" + fileName);
+            Files.write(outputFile.toPath(), fileData);
+            broadcastFile(fileName);
+        }
+
+        private long readLongFromBufferedStream() throws IOException {
+            byte[] longBytes = new byte[8];  // Long có kích thước 8 byte
+            readFully(bufferedIn, longBytes);
+            return ByteBuffer.wrap(longBytes)
+                    .order(ByteOrder.BIG_ENDIAN) // Đảm bảo sử dụng BIG_ENDIAN
+                    .getLong();
+        }
+
+        private int readIntFromBufferedStream() throws IOException {
+            byte[] intBytes = new byte[4];  // Int có kích thước 4 byte
+            readFully(bufferedIn, intBytes);
+            return ((int) (intBytes[0] & 0xFF) << 24)
+                    | ((int) (intBytes[1] & 0xFF) << 16)
+                    | ((int) (intBytes[2] & 0xFF) << 8)
+                    | ((int) (intBytes[3] & 0xFF));
+        }
+
+        private void readFully(BufferedInputStream in, byte[] buffer) throws IOException {
+            int offset = 0;
+            int bytesRead;
+            while (offset < buffer.length && (bytesRead = in.read(buffer, offset, buffer.length - offset)) != -1) {
+                offset += bytesRead;
+            }
+            if (offset < buffer.length) {
+                throw new EOFException("Premature EOF encountered while reading data");
+            }
+        }
+
+        private void broadcastMessage(String message) {
+            synchronized (clients) {
+                for (ClientHandler client : clients) {
+                    if (client != this) {
+                        client.out.println(message);
                     }
                 }
             }
         }
-    }
 
-    private void broadcastFile(String fileName) {
-    synchronized (clients) {
-        for (ClientHandler client : clients) {
-            if (client != this) {
-                try {
-                    // Gửi thông báo cho client rằng có một file mới
-                    client.out.println("FILE|");
-
-                    // Gửi tên file (không gửi nội dung file)
-                    byte[] nameBytes = fileName.getBytes("UTF-8");
-                    client.dataOut.writeInt(nameBytes.length);  // Gửi độ dài tên file
-                    client.dataOut.write(nameBytes);            // Gửi tên file
-                    client.dataOut.flush();  // Đảm bảo dữ liệu được gửi ngay lập tức
-                    System.out.println("File name sent successfully to client: " + client.clientSocket.getInetAddress());
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    System.err.println("Failed to send file name to client: " + client.clientSocket.getInetAddress());
+        private void broadcastImage(String imageName, byte[] imageData) {
+            synchronized (clients) {
+                for (ClientHandler client : clients) {
+                    if (client != this) {
+                        try {
+                            client.out.println("IMAGE|");
+                            client.dataOut.writeLong(imageData.length);
+                            byte[] nameBytes = imageName.getBytes("UTF-8");
+                            client.dataOut.writeInt(nameBytes.length);
+                            client.dataOut.write(nameBytes);
+                            client.dataOut.write(imageData);
+                            client.dataOut.flush();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
                 }
             }
         }
-    }
-}
 
-    private void closeConnection() {
-        try {
-            if (out != null) {
-                out.close();
+        private void broadcastFile(String fileName) {
+            synchronized (clients) {
+                for (ClientHandler client : clients) {
+                    if (client != this) {
+                        try {
+                            client.out.println("FILE|");
+                            byte[] nameBytes = fileName.getBytes("UTF-8");
+                            client.dataOut.writeInt(nameBytes.length);
+                            client.dataOut.write(nameBytes);
+                            client.dataOut.flush();
+                            System.out.println("File name sent successfully to client: " + client.clientSocket.getInetAddress());
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                            System.err.println("Failed to send file name to client: " + client.clientSocket.getInetAddress());
+                        }
+                    }
+                }
             }
-            if (in != null) {
-                in.close();
-            }
-            if (bufferedIn != null) {
-                bufferedIn.close();
-            }
-            if (dataOut != null) {
-                dataOut.close();
-            }
-            if (clientSocket != null) {
-                clientSocket.close();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
         }
-        clients.remove(this);
-    }
-}
 
+        private void closeConnection() {
+            try {
+                if (out != null) {
+                    out.close();
+                }
+                if (in != null) {
+                    in.close();
+                }
+                if (bufferedIn != null) {
+                    bufferedIn.close();
+                }
+                if (dataOut != null) {
+                    dataOut.close();
+                }
+                if (clientSocket != null) {
+                    clientSocket.close();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            clients.remove(this);
+        }
+    }
 
     /**
      * This method is called from within the constructor to initialize the form.

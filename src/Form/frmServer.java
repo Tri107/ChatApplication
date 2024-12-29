@@ -319,8 +319,14 @@ public class frmServer extends javax.swing.JFrame {
         txaserver.setRows(5);
         jScrollPane1.setViewportView(txaserver);
 
+        btnkhoidong.setBackground(new java.awt.Color(51, 51, 255));
+        btnkhoidong.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
+        btnkhoidong.setForeground(new java.awt.Color(255, 255, 255));
         btnkhoidong.setText("Start");
 
+        btnstop.setBackground(new java.awt.Color(255, 0, 0));
+        btnstop.setFont(new java.awt.Font("Segoe UI", 1, 14)); // NOI18N
+        btnstop.setForeground(new java.awt.Color(255, 255, 255));
         btnstop.setText("Stop");
         btnstop.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -333,25 +339,25 @@ public class frmServer extends javax.swing.JFrame {
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
-                .addGap(44, 44, 44)
+                .addContainerGap()
                 .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 350, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(43, 43, 43)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(btnkhoidong)
                     .addComponent(btnstop))
-                .addContainerGap(60, Short.MAX_VALUE))
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
-                .addGap(45, 45, 45)
+                .addContainerGap()
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(layout.createSequentialGroup()
                         .addComponent(btnkhoidong)
-                        .addGap(37, 37, 37)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(btnstop))
                     .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 223, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addContainerGap(163, Short.MAX_VALUE))
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
         pack();

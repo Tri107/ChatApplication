@@ -26,13 +26,14 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.StandardCopyOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.sql.ResultSet;
 
 /**
  *
  * @author DELL
  */
-
 public class frmChatApp extends javax.swing.JFrame {
 
     private String username;
@@ -55,6 +56,7 @@ public class frmChatApp extends javax.swing.JFrame {
 
         connectToServer();
         connectToDatabase();
+         hashAndUpdatePasswords();
         loadMessagesFromDatabase();
         btngui.addActionListener(evt -> sendMessage());
     }
@@ -66,6 +68,7 @@ public class frmChatApp extends javax.swing.JFrame {
 
         connectToServer();
         connectToDatabase();
+        
         btngui.addActionListener(evt -> sendMessage());
     }
 
@@ -78,6 +81,80 @@ public class frmChatApp extends javax.swing.JFrame {
             connection = DriverManager.getConnection(url, user, password);
         } catch (SQLException e) {
             e.printStackTrace();
+        }
+    }
+
+    private String hashPassword(String password) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] hashedBytes = md.digest(password.getBytes());
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hashedBytes) {
+                hexString.append(String.format("%02x", b));
+            }
+            return hexString.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("Thuật toán mã hóa không khả dụng!", e);
+        }
+    }
+
+    private void hashAndUpdatePasswords() {
+        if (connection == null) {
+            return;
+        }
+        try (PreparedStatement selectStatement = connection.prepareStatement(
+                "SELECT UserID, PasswordHash FROM Users"); PreparedStatement updateStatement = connection.prepareStatement(
+                        "UPDATE Users SET PasswordHash = ? WHERE UserID = ?")) {
+
+            ResultSet resultSet = selectStatement.executeQuery();
+
+            while (resultSet.next()) {
+                int userId = resultSet.getInt("UserID");
+                String passwordHash = resultSet.getString("PasswordHash");
+
+                // Kiểm tra xem mật khẩu đã được mã hóa chưa
+                if (passwordHash != null && passwordHash.length() == 32) { // MD5 có 32 ký tự
+                    continue; // Đã mã hóa, bỏ qua
+                }
+
+                // Mã hóa lại mật khẩu
+                String hashedPassword = hashPassword(passwordHash);
+
+                // Cập nhật vào cơ sở dữ liệu
+                updateStatement.setString(1, hashedPassword);
+                updateStatement.setInt(2, userId);
+                updateStatement.executeUpdate();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void registerUser(String username, String password) {
+        String hashedPassword = hashPassword(password);
+        try (PreparedStatement preparedStatement = connection.prepareStatement(
+                "INSERT INTO Users (Username, PasswordHash) VALUES (?, ?)")) {
+            preparedStatement.setString(1, username);
+            preparedStatement.setString(2, hashedPassword);
+            preparedStatement.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Không thể đăng ký người dùng!", "Lỗi", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private boolean loginUser(String username, String password) {
+        String hashedPassword = hashPassword(password);
+        try (PreparedStatement preparedStatement = connection.prepareStatement(
+                "SELECT * FROM Users WHERE Username = ? AND PasswordHash = ?")) {
+            preparedStatement.setString(1, username);
+            preparedStatement.setString(2, hashedPassword);
+            ResultSet resultSet = preparedStatement.executeQuery();
+            return resultSet.next(); // Nếu có kết quả, đăng nhập thành công
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Không thể đăng nhập!", "Lỗi", JOptionPane.ERROR_MESSAGE);
+            return false;
         }
     }
 
@@ -284,7 +361,7 @@ public class frmChatApp extends javax.swing.JFrame {
             SimpleAttributeSet align = new SimpleAttributeSet();
             StyleConstants.setAlignment(align, isSender ? StyleConstants.ALIGN_RIGHT : StyleConstants.ALIGN_LEFT);
             doc.setParagraphAttributes(doc.getLength(), 1, align, false);
-            String displayName = isSender ? username  : sender;
+            String displayName = isSender ? username : sender;
             StyleConstants.setForeground(style, isSender ? Color.BLUE : Color.BLACK);
             StyleConstants.setBold(style, true);
             doc.insertString(doc.getLength(), displayName + ":\n", style);
@@ -451,60 +528,59 @@ public class frmChatApp extends javax.swing.JFrame {
             e.printStackTrace();
         }
     }
-    private void requestFileDownload(String fileName) {
-    try {
-        // Gửi yêu cầu tải file tới server
-        PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-        out.println("DOWNLOAD|" + fileName);  // Gửi yêu cầu tải file
-        
-        // Nhận phản hồi từ server
-        DataInputStream in = new DataInputStream(socket.getInputStream());
-        String response = in.readUTF();
-        
-        if (response.startsWith("FILE|")) {
-            // Server đồng ý gửi file
-            String fileNameFromServer = response.substring(5);
-            long fileSize = in.readLong();
-            
-            // Tạo file để lưu dữ liệu nhận được
-            File file = new File("downloaded_" + fileNameFromServer);
-            try (BufferedOutputStream fileOut = new BufferedOutputStream(new FileOutputStream(file))) {
-                byte[] buffer = new byte[4096];
-                int bytesRead;
-                long remainingBytes = fileSize;
-                
-                while ((bytesRead = in.read(buffer, 0, (int) Math.min(buffer.length, remainingBytes))) != -1) {
-                    fileOut.write(buffer, 0, bytesRead);
-                    remainingBytes -= bytesRead;
-                    if (remainingBytes == 0) {
-                        break;
-                    }
-                }
-                fileOut.flush();
-                JOptionPane.showMessageDialog(this, "Tải file " + fileNameFromServer + " thành công.");
-            } catch (IOException e) {
-                JOptionPane.showMessageDialog(this, "Lỗi khi lưu file: " + e.getMessage());
-            }
-        } else {
-            // Server gửi lỗi, ví dụ file không tồn tại
-            JOptionPane.showMessageDialog(this, "Lỗi: " + response.substring(6));
-        }
-    } catch (IOException e) {
-        JOptionPane.showMessageDialog(this, "Lỗi kết nối khi tải file: " + e.getMessage());
-    }
-}
-    private void copyFile(File source, File destination) throws IOException {
-    try (FileInputStream fileIn = new FileInputStream(source);
-         FileOutputStream fileOut = new FileOutputStream(destination)) {
-        byte[] buffer = new byte[1024];
-        int bytesRead;
-        while ((bytesRead = fileIn.read(buffer)) != -1) {
-            fileOut.write(buffer, 0, bytesRead);
-        }
-    }
-}
 
-    
+    private void requestFileDownload(String fileName) {
+        try {
+            // Gửi yêu cầu tải file tới server
+            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+            out.println("DOWNLOAD|" + fileName);  // Gửi yêu cầu tải file
+
+            // Nhận phản hồi từ server
+            DataInputStream in = new DataInputStream(socket.getInputStream());
+            String response = in.readUTF();
+
+            if (response.startsWith("FILE|")) {
+                // Server đồng ý gửi file
+                String fileNameFromServer = response.substring(5);
+                long fileSize = in.readLong();
+
+                // Tạo file để lưu dữ liệu nhận được
+                File file = new File("downloaded_" + fileNameFromServer);
+                try (BufferedOutputStream fileOut = new BufferedOutputStream(new FileOutputStream(file))) {
+                    byte[] buffer = new byte[4096];
+                    int bytesRead;
+                    long remainingBytes = fileSize;
+
+                    while ((bytesRead = in.read(buffer, 0, (int) Math.min(buffer.length, remainingBytes))) != -1) {
+                        fileOut.write(buffer, 0, bytesRead);
+                        remainingBytes -= bytesRead;
+                        if (remainingBytes == 0) {
+                            break;
+                        }
+                    }
+                    fileOut.flush();
+                    JOptionPane.showMessageDialog(this, "Tải file " + fileNameFromServer + " thành công.");
+                } catch (IOException e) {
+                    JOptionPane.showMessageDialog(this, "Lỗi khi lưu file: " + e.getMessage());
+                }
+            } else {
+                // Server gửi lỗi, ví dụ file không tồn tại
+                JOptionPane.showMessageDialog(this, "Lỗi: " + response.substring(6));
+            }
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(this, "Lỗi kết nối khi tải file: " + e.getMessage());
+        }
+    }
+
+    private void copyFile(File source, File destination) throws IOException {
+        try (FileInputStream fileIn = new FileInputStream(source); FileOutputStream fileOut = new FileOutputStream(destination)) {
+            byte[] buffer = new byte[1024];
+            int bytesRead;
+            while ((bytesRead = fileIn.read(buffer)) != -1) {
+                fileOut.write(buffer, 0, bytesRead);
+            }
+        }
+    }
 
     private void reconnect() {
         try {
@@ -715,37 +791,37 @@ public class frmChatApp extends javax.swing.JFrame {
     private void btndownloadActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btndownloadActionPerformed
         String fileName = JOptionPane.showInputDialog(this, "Nhập tên file cần tải:", "Tải file", JOptionPane.QUESTION_MESSAGE);
 
-    // Kiểm tra nếu người dùng nhập tên file
-    if (fileName != null && !fileName.trim().isEmpty()) {
-        // Đường dẫn thư mục lưu file trên server
-        String serverFilesPath = "D:\\server_files";
-        File sourceFile = new File(serverFilesPath, fileName.trim());
+        // Kiểm tra nếu người dùng nhập tên file
+        if (fileName != null && !fileName.trim().isEmpty()) {
+            // Đường dẫn thư mục lưu file trên server
+            String serverFilesPath = "C:\\server_files";
+            File sourceFile = new File(serverFilesPath, fileName.trim());
 
-        // Kiểm tra file có tồn tại trên server không
-        if (!sourceFile.exists()) {
-            JOptionPane.showMessageDialog(this, "File không tồn tại trong thư mục server_files!", "Lỗi", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
+            // Kiểm tra file có tồn tại trên server không
+            if (!sourceFile.exists()) {
+                JOptionPane.showMessageDialog(this, "File không tồn tại trong thư mục server_files!", "Lỗi", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
 
-        // Hiển thị hộp thoại để người dùng chọn nơi lưu file
-        JFileChooser fileChooser = new JFileChooser();
-        fileChooser.setDialogTitle("Chọn nơi lưu file");
-        fileChooser.setSelectedFile(new File(fileName.trim()));
+            // Hiển thị hộp thoại để người dùng chọn nơi lưu file
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setDialogTitle("Chọn nơi lưu file");
+            fileChooser.setSelectedFile(new File(fileName.trim()));
 
-        int result = fileChooser.showSaveDialog(this);
-        if (result == JFileChooser.APPROVE_OPTION) {
-            File destinationFile = fileChooser.getSelectedFile();
+            int result = fileChooser.showSaveDialog(this);
+            if (result == JFileChooser.APPROVE_OPTION) {
+                File destinationFile = fileChooser.getSelectedFile();
 
-            try {
-                // Copy file từ server_files sang nơi người dùng chọn
-                copyFile(sourceFile, destinationFile);
-                JOptionPane.showMessageDialog(this, "File đã được tải về: " + destinationFile.getAbsolutePath(), "Thành công", JOptionPane.INFORMATION_MESSAGE);
-            } catch (IOException e) {
-                JOptionPane.showMessageDialog(this, "Lỗi khi tải file: " + e.getMessage(), "Lỗi", JOptionPane.ERROR_MESSAGE);
-                e.printStackTrace();
+                try {
+                    // Copy file từ server_files sang nơi người dùng chọn
+                    copyFile(sourceFile, destinationFile);
+                    JOptionPane.showMessageDialog(this, "File đã được tải về: " + destinationFile.getAbsolutePath(), "Thành công", JOptionPane.INFORMATION_MESSAGE);
+                } catch (IOException e) {
+                    JOptionPane.showMessageDialog(this, "Lỗi khi tải file: " + e.getMessage(), "Lỗi", JOptionPane.ERROR_MESSAGE);
+                    e.printStackTrace();
+                }
             }
         }
-    }
     }//GEN-LAST:event_btndownloadActionPerformed
 
     /**
